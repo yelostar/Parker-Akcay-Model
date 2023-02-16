@@ -292,7 +292,7 @@ function getDegree(network::NetworkParameters) #made less efficient by 2 in edge
     degGetter
 end
 
-function runSims(CL::Float64, BEN::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
+function runSims(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
     dataArray = zeros(8)
     repSims = 100
     for(x) in 1:repSims
@@ -345,7 +345,7 @@ function runSims(CL::Float64, BEN::Float64, gen::Int, pnc::Float64, pnd::Float64
     save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-function runSimsReturn(CL::Float64, BEN::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
+function runSimsReturn(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
     dataArray = zeros(8)
     repSims = 50
     for(x) in 1:repSims
@@ -397,34 +397,7 @@ function runSimsReturn(CL::Float64, BEN::Float64, gen::Int, pnc::Float64, pnd::F
     return dataArray
 end
 
-argTab = ArgParseSettings(description = "arguments and stuff, don't worry about it")
-@add_arg_table argTab begin
-    "--cLink"
-        arg_type = Float64
-        default = 0.0
-    "--gens"
-        arg_type = Int
-        default = 500
-    "--pnc"
-        arg_type = Float64
-        default = 0.5
-    "--pnd"
-        arg_type = Float64
-        default = 0.5
-    "--pr"
-        arg_type = Float64
-        default = 0.001
-end
-parsedArgs = parse_args(ARGS, argTab)
-currCostLink = parsedArgs["cLink"]
-currGens = parsedArgs["gens"]
-currPNC = parsedArgs["pnc"]
-currPD = parsedArgs["pnd"]
-currPR = parsedArgs["pr"]
-for(b) in 2:3
-    currBenefit = Float64(b)
-    runSims(currCostLink, currBenefit, currGens, currPNC, currPD, currPR)
-end
+
 
 
 #=profiling
