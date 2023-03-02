@@ -54,7 +54,12 @@ mutable struct NetworkParameters
         popFitness = zeros(Float64, popSize)
         popFitness[:] .= 1.0
 
-        edgeMatrix = zeros(Int64, 100, 100)
+        #edgeMatrix = zeros(Int64, 100, 100)
+        edgeMatrix=rand([0,1],(popSize,popSize))
+        edgeMatrix = edgeMatrix .* transpose(edgeMatrix)
+        for(i) in 1:popSize
+            edgeMatrix[i, i] = 0
+        end
         cost = 0.5
         synergism = 0.0
         benefit = b
@@ -359,9 +364,10 @@ function runSimsReturn(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::F
             childID = death(network)
             parentID = findMom(network, childID)
             birth(network, childID, parentID)
-            if(g > (network.numGens * network.popSize / 5))
+            if(g > (20))
                 cooperate(network)
             end
+            #cooperate(network)
             resolveFitnesses(network)
 
             if(g > (network.numGens * network.popSize / 5) && (g % network.popSize) == 0)
