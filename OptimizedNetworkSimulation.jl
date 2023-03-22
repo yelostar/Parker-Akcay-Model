@@ -36,33 +36,39 @@ mutable struct NetworkParameters
     benefit::Float64
     synergism::Float64
     linkCost::Float64
-    mu::Float64
+    muS::Float64
+    muP::Float64    
     delta::Float64
 
-    function NetworkParameters(b::Float64, cL::Float64, gen::Int)
+    function NetworkParameters(b::Float64, cL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
 
-        numGens = gen
         popSize = 100
         popPNC = zeros(Float64, popSize)
-        popPNC[:] .= 0.5
+        popPNC[:] .= pnc
         popPND = zeros(Float64, popSize)
-        popPND[:] .= 0.5
+        popPND[:] .= pnd
         popPR = zeros(Float64, popSize)
-        popPR[:] .= .0001
+        popPR[:] .= pr
         popStrategies = zeros(Int64, popSize)
         popStrategies[2:2:popSize] .= 1
         popFitness = zeros(Float64, popSize)
         popFitness[:] .= 1.0
 
-        edgeMatrix = zeros(Int64, 100, 100)
+        #edgeMatrix = zeros(Int64, 100, 100)
+        edgeMatrix=rand([0,1],(popSize,popSize))
+        edgeMatrix = edgeMatrix .* transpose(edgeMatrix)
+        for(i) in 1:popSize
+            edgeMatrix[i, i] = 0
+        end
         cost = 0.5
         synergism = 0.0
         benefit = b
         linkCost = cL
-        mu = .01
+        muS = .001 #changing strategies
+        muP = 0 #changing probabilities of forming links
         delta = 0.1 #EDIT 0.5
 
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPR, popStrategies, zeros(Float64, popSize), popFitness, numGens, popSize, edgeMatrix, cost, benefit, synergism, linkCost, mu, delta)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPR, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta)
     end
 end
 
@@ -198,24 +204,24 @@ end
 
 function birth(network::NetworkParameters, child::Int64, parent::Int64)
     network.popStrategies[child] = network.popStrategies[parent]
-    if(rand()<network.mu)
+    if(rand()<network.muS)
         network.popStrategies[child] -= 1
         network.popStrategies[child] *= -1
     end
     network.popPNC[child] = network.popPNC[parent]
-    if(rand()<network.mu)
+    if(rand()<network.muP)
         network.popPNC[child] += randn()/100
         network.popPNC[child] = clamp(network.popPNC[child], 0, 1)
     end
 
     network.popPND[child] = network.popPND[parent]
-    if(rand()<network.mu)
+    if(rand()<network.muP)
         network.popPND[child] += randn()/100
         network.popPND[child] = clamp(network.popPND[child], 0, 1)
     end
 
     network.popPR[child] = network.popPR[parent]
-    if(rand()<network.mu)
+    if(rand()<network.muP)
         network.popPR[child] += randn()/100
         network.popPR[child] = clamp(network.popPR[child], 0, 1)
     end
@@ -291,13 +297,13 @@ function getDegree(network::NetworkParameters) #made less efficient by 2 in edge
     degGetter
 end
 
-function runSims(CL::Float64, BEN::Float64, gen::Int)
+function runSims(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
     dataArray = zeros(8)
-    repSims = 10
+    repSims = 100
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(BEN, CL, gen)
+        network = NetworkParameters(BEN, CL, gen, pnc, pnd, pr)
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
@@ -324,9 +330,9 @@ function runSims(CL::Float64, BEN::Float64, gen::Int)
         network.meanProbNeighborCoop /= (network.popSize*network.numGens*0.8)
         network.meanProbNeighborDef /= (network.popSize*network.numGens*0.8)
         network.meanProbRandom /= (network.popSize*network.numGens*0.8)
-        network.meanDegree /= (network.popSize*network.numGens*0.8)
+        network.meanDegree /= (network.numGens*0.8)
         network.meanAssortment /= (network.popSize*network.numGens*0.8)
-        network.meanCoopFreq /= (network.popSize*network.numGens*0.8)
+        network.meanCoopFreq /= (network.numGens*0.8)
         network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
         network.meanDistInclusion /= (network.popSize*network.numGens*0.8)
 
@@ -341,25 +347,63 @@ function runSims(CL::Float64, BEN::Float64, gen::Int)
     end
     dataArray[:] ./= Float64(repSims)
     #EDIT NAME
-    save("newAssortmentCD_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
+    save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-argTab = ArgParseSettings(description = "arguments and stuff, don't worry about it")
-@add_arg_table argTab begin
-    "--cLink"
-        arg_type = Float64
-        default = 0.0
-    "--gens"
-        arg_type = Int
-        default = 500
+function runSimsReturn(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
+    dataArray = zeros(8)
+    repSims = 50
+    for(x) in 1:repSims
+
+        #initializes globalstuff structure with generic constructor
+        network = NetworkParameters(BEN, CL, gen, pnc, pnd, pr)
+
+        #checks efficiency of simulation while running it
+        for(g) in 1:(network.numGens * network.popSize)
+
+            childID = death(network)
+            parentID = findMom(network, childID)
+            birth(network, childID, parentID)
+            if(g > (20))
+                cooperate(network)
+            end
+            #cooperate(network)
+            resolveFitnesses(network)
+
+            if(g > (network.numGens * network.popSize / 5) && (g % network.popSize) == 0)
+                coopRatio(network)
+                #probNeighbor(network)
+                #probRandom(network)
+                degrees(network)
+                #distance(network)
+            end
+
+        end
+
+        #divides meanCooperationRatio by last 400 generations to get a true mean, then outputs
+        network.meanProbNeighborCoop /= (network.popSize*network.numGens*0.8)
+        network.meanProbNeighborDef /= (network.popSize*network.numGens*0.8)
+        network.meanProbRandom /= (network.popSize*network.numGens*0.8)
+        network.meanDegree /= (network.numGens*0.8)
+        network.meanAssortment /= (network.numGens*0.8)
+        network.meanCoopFreq /= (network.numGens*0.8)
+        network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
+        network.meanDistInclusion /= (network.popSize*network.numGens*0.8)
+
+        dataArray[1] += network.meanProbNeighborCoop
+        dataArray[2] += network.meanProbNeighborDef
+        dataArray[3] += network.meanProbRandom
+        dataArray[4] += network.meanDegree
+        dataArray[5] += network.meanAssortment
+        dataArray[6] += network.meanCoopDefDistance
+        dataArray[7] += network.meanDistInclusion
+        dataArray[8] += network.meanCoopFreq
+    end
+    dataArray[:] ./= Float64(repSims)
+    return dataArray
 end
-parsedArgs = parse_args(ARGS, argTab)
-currCostLink = parsedArgs["cLink"]
-currGens = parsedArgs["gens"]
-for(b) in 2:3
-    currBenefit = Float64(b)
-    runSims(currCostLink, currBenefit, currGens)
-end
+
+
 
 
 #=profiling
