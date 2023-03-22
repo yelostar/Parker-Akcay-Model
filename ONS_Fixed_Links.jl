@@ -40,7 +40,7 @@ mutable struct NetworkParameters
     muP::Float64    
     delta::Float64
 
-    function NetworkParameters(b::Float64, cL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
+    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
 
         popSize = 100
         popPNC = zeros(Float64, popSize)
@@ -56,12 +56,12 @@ mutable struct NetworkParameters
 
         #edgeMatrix = zeros(Int64, 100, 100)
         edgeMatrix=rand([0,1],(popSize,popSize))
-        edgeMatrix = edgeMatrix .* transpose(edgeMatrix)
+        edgeMatrix = edgeMatrix .* transpose(edgeMatrix) #ensures that connections are reciprocated
         for(i) in 1:popSize
-            edgeMatrix[i, i] = 0
+            edgeMatrix[i, i] = 0 #cannot connect with themself
         end
-        cost = 0.5
-        synergism = 0.0
+        cost = c
+        synergism = d
         benefit = b
         linkCost = cL
         muS = .001 #changing strategies
@@ -225,10 +225,11 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
         network.popPR[child] += randn()/100
         network.popPR[child] = clamp(network.popPR[child], 0, 1)
     end
-    if(rand() < network.popPNC[child])
-        network.edgeMatrix[parent, child] = 1
-        network.edgeMatrix[child, parent] = 1
-    end #Pb != 1 now
+    #if(rand() < network.popPNC[child])
+    network.edgeMatrix[parent, child] = 1
+    network.edgeMatrix[child, parent] = 1
+    #end 
+    #Pb != 1 now
 
     for(i) in 1:network.popSize
         if(i != child && network.edgeMatrix[i, child] == 0)
@@ -297,13 +298,13 @@ function getDegree(network::NetworkParameters) #made less efficient by 2 in edge
     degGetter
 end
 
-function runSims(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
+function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pnc::Float64=0.5, pnd::Float64=0.5, pr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(8)
     repSims = 100
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(BEN, CL, gen, pnc, pnd, pr)
+        network = NetworkParameters(B, C, D, CL, gen, pnc, pnd, pr)
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
@@ -350,13 +351,13 @@ function runSims(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::Float64
     save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-function runSimsReturn(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pnc::Float64=0.5, pnd::Float64=0.5, pr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(8)
-    repSims = 50
+    repSims = reps
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(BEN, CL, gen, pnc, pnd, pr)
+        network = NetworkParameters(B, C, D, CL, gen, pnc, pnd, pr)
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
