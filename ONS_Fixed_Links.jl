@@ -40,7 +40,11 @@ mutable struct NetworkParameters
     muP::Float64    
     delta::Float64
 
-    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
+    #evolving links variables
+    sigmapn::Float64
+    sigmapr::Float64
+
+    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64, muP::Float64)
 
         popSize = 100
         popPNC = zeros(Float64, popSize)
@@ -64,11 +68,12 @@ mutable struct NetworkParameters
         synergism = d
         benefit = b
         linkCost = cL
+        sigmapn = 0.05
+        sigmapr = 0.01
         muS = .001 #changing strategies
-        muP = 0 #changing probabilities of forming links
         delta = 0.1 #EDIT 0.5
 
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPR, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPR, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, sigmapn, sigmapr)
     end
 end
 
@@ -210,19 +215,19 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
     end
     network.popPNC[child] = network.popPNC[parent]
     if(rand()<network.muP)
-        network.popPNC[child] += randn()/100
+        network.popPNC[child] += randn()*network.sigmapn
         network.popPNC[child] = clamp(network.popPNC[child], 0, 1)
     end
 
     network.popPND[child] = network.popPND[parent]
     if(rand()<network.muP)
-        network.popPND[child] += randn()/100
+        network.popPND[child] += randn()*network.sigmapn
         network.popPND[child] = clamp(network.popPND[child], 0, 1)
     end
 
     network.popPR[child] = network.popPR[parent]
     if(rand()<network.muP)
-        network.popPR[child] += randn()/100
+        network.popPR[child] += randn()*network.sigmapr
         network.popPR[child] = clamp(network.popPR[child], 0, 1)
     end
     #if(rand() < network.popPNC[child])
@@ -298,13 +303,13 @@ function getDegree(network::NetworkParameters) #made less efficient by 2 in edge
     degGetter
 end
 
-function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pnc::Float64=0.5, pnd::Float64=0.5, pr::Float64=0.01, reps::Int64=50)
+function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pnc::Float64=0.5, pnd::Float64=0.5, pr::Float64=0.01, muP::Float64=0.001, reps::Int64=50)
     dataArray = zeros(8)
     repSims = 100
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(B, C, D, CL, gen, pnc, pnd, pr)
+        network = NetworkParameters(B, C, D, CL, gen, pnc, pnd, pr, muP)
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
@@ -319,8 +324,8 @@ function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.
 
             if(g > (network.numGens * network.popSize / 5) && (g % network.popSize) == 0)
                 coopRatio(network)
-                #probNeighbor(network)
-                #probRandom(network)
+                probNeighbor(network)
+                probRandom(network)
                 degrees(network)
                 #distance(network)
             end
@@ -328,9 +333,9 @@ function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.
         end
 
         #divides meanCooperationRatio by last 400 generations to get a true mean, then outputs
-        network.meanProbNeighborCoop /= (network.popSize*network.numGens*0.8)
-        network.meanProbNeighborDef /= (network.popSize*network.numGens*0.8)
-        network.meanProbRandom /= (network.popSize*network.numGens*0.8)
+        network.meanProbNeighborCoop /= (network.numGens*0.8)
+        network.meanProbNeighborDef /= (network.numGens*0.8)
+        network.meanProbRandom /= (network.numGens*0.8)
         network.meanDegree /= (network.numGens*0.8)
         network.meanAssortment /= (network.popSize*network.numGens*0.8)
         network.meanCoopFreq /= (network.numGens*0.8)
@@ -351,13 +356,13 @@ function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.
     save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pnc::Float64=0.5, pnd::Float64=0.5, pr::Float64=0.01, reps::Int64=50)
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pnc::Float64=0.5, pnd::Float64=0.5, pr::Float64=0.01, muP::Float64=0.001, reps::Int64=50)
     dataArray = zeros(8)
     repSims = reps
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(B, C, D, CL, gen, pnc, pnd, pr)
+        network = NetworkParameters(B, C, D, CL, gen, pnc, pnd, pr, muP)
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
@@ -373,8 +378,8 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
 
             if(g > (network.numGens * network.popSize / 5) && (g % network.popSize) == 0)
                 coopRatio(network)
-                #probNeighbor(network)
-                #probRandom(network)
+                probNeighbor(network)
+                probRandom(network)
                 degrees(network)
                 #distance(network)
             end
@@ -382,9 +387,9 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         end
 
         #divides meanCooperationRatio by last 400 generations to get a true mean, then outputs
-        network.meanProbNeighborCoop /= (network.popSize*network.numGens*0.8)
-        network.meanProbNeighborDef /= (network.popSize*network.numGens*0.8)
-        network.meanProbRandom /= (network.popSize*network.numGens*0.8)
+        network.meanProbNeighborCoop /= (network.numGens*0.8)
+        network.meanProbNeighborDef /= (network.numGens*0.8)
+        network.meanProbRandom /= (network.numGens*0.8)
         network.meanDegree /= (network.numGens*0.8)
         network.meanAssortment /= (network.numGens*0.8)
         network.meanCoopFreq /= (network.numGens*0.8)

@@ -12,9 +12,9 @@ function dataCollect(range::Int) #collects data from 0.1 - range/10 for PNC/D an
     for(i) in 1:range #PNC/PND 
         for(j) in 1:range #PNR 
             vals = (i/(range), j/(20*range)) #easier access
-            coopFreq = runSimsReturn(B=2.0, C=0.5, gen=500, pnc=vals[1], pnd=vals[1], pr=vals[2], reps=50)
+            coopFreq = runSimsReturn(B=2.0, C=0.5, gen=5000, pnc=vals[1], pnd=vals[1], pr=vals[2], reps=50, muP=0.001)
             #function run0SimsReturn(BEN::Float64, CL::Float64, gen::Int, pnc::Float64, pnd::Float64, pr::Float64)
-            println(coopFreq[8], " ", round(vals[1]; digits = 3), "-PN, ", round(vals[2]; digits = 3), "-PR")
+            println(coopFreq[1], " ", coopFreq[8], " ", round(vals[1]; digits = 3), "-PN, ", round(vals[2]; digits = 3), "-PR")
             freqs[i, j, :] = coopFreq
         end
     end
@@ -28,10 +28,26 @@ function hmap(data, range::Int, index::Int) #index 8 is coop frequency
         push!(x_axis, (string(round(i/(20*range); digits = 3))))
         push!(y_axis, (string(round(i/(range); digits = 3))))
     end
-    p = heatmap(x_axis, y_axis, data[:, :, index]; title = "Cooperation Frequencies",)
+    p = heatmap(x_axis, y_axis, data[:, :, index]; title = "Cooperation Freq",)
     gui(p)
 end
 
 #notebook for running below
-data = dataCollect(10)
-hmap(data, 10, 8)
+data = dataCollect(4)
+
+hmap(data, 4, 8)
+
+#save("parker-hmap1.jld", "matr", data)
+#currentDict = load("akcay-hmap1.jld")
+#data2 = currentDict["matr"]
+#diff = data[:, :, 8] - data2[:, :, 1]
+#hmap(diff, 10, 1)
+
+#dataArray[1] += network.meanProbNeighborCoop
+#dataArray[2] += network.meanProbNeighborDef
+#dataArray[3] += network.meanProbRandom
+#dataArray[4] += network.meanDegree
+#dataArray[5] += network.meanAssortment
+#dataArray[6] += network.meanCoopDefDistance
+#dataArray[7] += network.meanDistInclusion
+#dataArray[8] += network.meanCoopFreq
