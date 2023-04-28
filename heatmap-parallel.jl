@@ -1,12 +1,14 @@
-@everywhere include("ONS_Fixed_Links.jl")
 
-    using JLD2
-    using StatsBase
-    using FileIO
-    using ArgParse
-    using Plots
-    using Distributed
-    backend(:plotly)
+
+using JLD2
+using StatsBase
+using FileIO
+using ArgParse
+using Plots
+using Distributed
+backend(:plotly)
+
+include("ONS_Fixed_Links.jl")
 
 addprocs(10) 
 inputs  = RemoteChannel(()->Channel{Dict}(4000)) #2*nsets*maximum(pars["num_crossings"])
@@ -20,6 +22,7 @@ pars = Dict{String,Any}([
     ])
 
 @everywhere function run_worker(inputs, results)
+    include("ONS_Fixed_Links.jl")
     while true
         pard = take!(inputs)
         println(pard["pn"], " ", pard["pr"], "in pard")
