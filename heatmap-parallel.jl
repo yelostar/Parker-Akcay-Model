@@ -1,5 +1,3 @@
-
-
 using JLD2
 using StatsBase
 using FileIO
@@ -9,17 +7,6 @@ using Distributed
 backend(:plotly)
 
 include("ONS_Fixed_Links.jl")
-
-addprocs(10) 
-inputs  = RemoteChannel(()->Channel{Dict}(4000)) #2*nsets*maximum(pars["num_crossings"])
-results = RemoteChannel(()->Channel{Dict}(4000))
-
-vals_arr = Array{Tuple}
-pars = Dict{String,Any}([
-        "pn"     => Dict("value" => 0, "type" => Float64),
-        "pr" => Dict("value" => 0, "type" => Float64),
-        "data" => Dict("value" => zeros(8), "type" => Matrix),
-    ])
 
 @everywhere function run_worker(inputs, results)
     include("ONS_Fixed_Links.jl")
@@ -60,14 +47,25 @@ function hmap(results, index::Int, chartTitle::String) #index 8 is coop frequenc
 end
 
 #notebook for running below
-
+        
+addprocs(10) 
+inputs  = RemoteChannel(()->Channel{Dict}(4000)) #2*nsets*maximum(pars["num_crossings"])
+results = RemoteChannel(()->Channel{Dict}(4000))
+        
+vals_arr = Array{Tuple}
+pars = Dict{String,Any}([
+        "pn"     => Dict("value" => 0, "type" => Float64),
+        "pr" => Dict("value" => 0, "type" => Float64),
+        "data" => Dict("value" => zeros(8), "type" => Matrix),
+    ])
+        
 fill_inputs(10)
 
 for w in workers() # start tasks on the workers to process requests in parallel
     remote_do(run_worker, w, inputs, results)
 end
 
-hmap(results, 10, 8)
+hmap(results, 8, "Cooperation Frequencies")
 
 #save("parker-hmap1.jld", "matr", data)
 #currentDict = load("akcay-hmap1.jld")
