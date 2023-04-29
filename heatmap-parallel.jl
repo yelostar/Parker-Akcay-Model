@@ -13,8 +13,8 @@ include("ONS_Fixed_Links.jl")
     while true
         pard = take!(inputs)
         println(pard["pn"], " ", pard["pr"], "in pard")
-        coopFreq = runSimsReturn(B=2.0, C=0.5, gen=500, pnc=pard["pn"], pnd=pard["pn"], pr=pard["pr"], reps=100, muP=0.001)
-        println(pard["pn"], " ", pard["pr"], coopFreq[8])
+        coopFreq = runSimsReturn(; B=2.0, C=0.5, D=0.0, CL=0.0, gen=500, pnc=pard["pn"], pnd=pard["pn"], pr=pard["pr"], muP=0.001, reps=100)
+        println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
         pard["data"] = coopFreq
         put!(results, pard)
     end
@@ -56,7 +56,7 @@ vals_arr = Array{Tuple}
 pars = Dict{String,Any}([
         "pn"     => Dict("value" => 0, "type" => Float64),
         "pr" => Dict("value" => 0, "type" => Float64),
-        "data" => Dict("value" => zeros(8), "type" => Matrix),
+        "data" => Dict("value" => zeros(8), "type" => Vector{Float64}),
     ])
         
 fill_inputs(10)
@@ -64,20 +64,3 @@ fill_inputs(10)
 for w in workers() # start tasks on the workers to process requests in parallel
     remote_do(run_worker, w, inputs, results)
 end
-
-hmap(results, 8, "Cooperation Frequencies")
-
-#save("parker-hmap1.jld", "matr", data)
-#currentDict = load("akcay-hmap1.jld")
-#data2 = currentDict["matr"]
-#diff = data[:, :, 8] - data2[:, :, 1]
-#hmap(diff, 10, 1)
-
-#dataArray[1] += network.meanProbNeighborCoop
-#dataArray[2] += network.meanProbNeighborDef
-#dataArray[3] += network.meanProbRandom
-#dataArray[4] += network.meanDegree
-#dataArray[5] += network.meanAssortment
-#dataArray[6] += network.meanCoopDefDistance
-#dataArray[7] += network.meanDistInclusion
-#dataArray[8] += network.meanCoopFreq
