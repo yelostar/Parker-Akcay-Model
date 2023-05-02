@@ -6,7 +6,9 @@ using Plots
 using Distributed
 backend(:plotly)
 
-include("ONS_Fixed_Links.jl")
+addprocs(10) 
+@everywhere include("ONS_Fixed_Links.jl")
+
 
 @everywhere function run_worker(inputs, results)
     include("ONS_Fixed_Links.jl")
@@ -48,7 +50,6 @@ end
 
 #notebook for running below
         
-addprocs(10) 
 inputs  = RemoteChannel(()->Channel{Dict}(4000)) #2*nsets*maximum(pars["num_crossings"])
 results = RemoteChannel(()->Channel{Dict}(4000))
         
@@ -64,3 +65,20 @@ fill_inputs(10)
 for w in workers() # start tasks on the workers to process requests in parallel
     remote_do(run_worker, w, inputs, results)
 end
+
+#hmap(results, 8, "Cooperation Frequencies")
+
+#save("parker-hmap1.jld", "matr", data)
+#currentDict = load("akcay-hmap1.jld")
+#data2 = currentDict["matr"]
+#diff = data[:, :, 8] - data2[:, :, 1]
+#hmap(diff, 10, 1)
+
+#dataArray[1] += network.meanProbNeighborCoop
+#dataArray[2] += network.meanProbNeighborDef
+#dataArray[3] += network.meanProbRandom
+#dataArray[4] += network.meanDegree
+#dataArray[5] += network.meanAssortment
+#dataArray[6] += network.meanCoopDefDistance
+#dataArray[7] += network.meanDistInclusion
+#dataArray[8] += network.meanCoopFreq
