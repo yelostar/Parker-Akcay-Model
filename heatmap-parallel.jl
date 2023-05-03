@@ -22,16 +22,14 @@ addprocs(10)
     end
 end
 
-function fill_inputs(range)
-    pard = Dict(zip(keys(pars), zeros(8)))
+function fill_inputs(range,pars)
     for(i) in 1:range #PNC/PND 
         for(j) in 1:range #PNR 
             vals = (i/(range), j/(20*range))
-            temp = copy(pard)
-            temp["pn"] = vals[1]
-            temp["pr"] = vals[2]
-            println(temp["pn"], " ", temp["pr"], "into inputs")
-            put!(inputs, temp)
+            pars["pn"] = vals[1]
+            pars["pr"] = vals[2]
+            println(pars["pn"], " ", pars["pr"], " into inputs")
+            put!(inputs, pars)
             #vals_arr.push(vals)
         end
     end
@@ -54,13 +52,13 @@ inputs  = RemoteChannel(()->Channel{Dict}(4000)) #2*nsets*maximum(pars["num_cros
 results = RemoteChannel(()->Channel{Dict}(4000))
         
 vals_arr = Array{Tuple}
-pars = Dict{String,Any}([
-        "pn"     => Dict("value" => 0, "type" => Float64),
-        "pr" => Dict("value" => 0, "type" => Float64),
-        "data" => Dict("value" => zeros(8), "type" => Vector{Float64}),
+pars = Dict([
+        "pn" => 0.0,
+        "pr" => 0.0,
+        "data" => zeros(8)
     ])
         
-fill_inputs(10)
+fill_inputs(10,pars)
 
 for w in workers() # start tasks on the workers to process requests in parallel
     remote_do(run_worker, w, inputs, results)
