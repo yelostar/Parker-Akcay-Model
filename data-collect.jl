@@ -15,10 +15,13 @@ addprocs(10)
     include("ONS_Fixed_Links.jl")
     while true
         pard = take!(inputs)
-        println(pard["pn"], " ", pard["pr"], "in pard")
+        println(pard["pn"], " ", pard["pr"], " in pard")
         coopFreq = runSimsReturn(; B=2.0, C=0.5, D=0.0, CL=0.0, gen=500, pnc=pard["pn"], pnd=pard["pn"], pr=pard["pr"], muP=0.001, reps=100)
-        println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
-        temp = Dict(zip(keys(pars), coopFreq))
+        #println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
+        Keys = ["pnc_end","pnd_end","pr_end","degree","assortment","distance","inclusion","coopFreq"]
+        temp = Dict(zip(Keys, coopFreq))
+        temp = merge(pard, temp)
+        println(temp["pn"], " ", temp["pr"], " CF: ", temp["coopFreq"])
         put!(results, temp)
     end
 end
@@ -78,7 +81,7 @@ file = "datacollect_10.csv"
     cols = push!(sort(collect(keys(pars))),
                  ["pn", "pr"]...)
     dat = DataFrame(Dict([(c, Any[]) for c in cols]))
-
+t
 for sim in 1:nruns
     # get results from parallel jobs
     flush(stdout)
