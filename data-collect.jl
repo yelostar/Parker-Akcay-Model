@@ -8,7 +8,7 @@ using CSV
 using Distributed
 backend(:plotly)
 
-addprocs(10) 
+addprocs(50) 
 @everywhere include("ONS_Fixed_Links.jl")
 
 @everywhere function run_worker(inputs, results)
@@ -42,21 +42,10 @@ function fill_inputs(range,pars, nruns)
     return nruns
 end
 
-function hmap(results, index::Int, chartTitle::String) #index 8 is coop frequency
-    x_axis = String[]
-    y_axis = String[]
-    for vec in results #PNC/PND times 10
-        push!(x_axis, (string(round(vec["pr"]; digits = 3))))
-        push!(y_axis, (string(round(vec["pn"]; digits = 3))))
-    end
-    p = heatmap(x_axis, y_axis, results["data"][index]; title = chartTitle,)
-    gui(p)
-end
-
 #notebook for running below
-        
-inputs  = RemoteChannel(()->Channel{Dict}(4000)) #2*nsets*maximum(pars["num_crossings"])
-results = RemoteChannel(()->Channel{Dict}(4000))
+range = 100        
+inputs  = RemoteChannel(()->Channel{Dict}(range*range)) #2*nsets*maximum(pars["num_crossings"])
+results = RemoteChannel(()->Channel{Dict}(range*range))
         
 vals_arr = Array{Tuple}
 pars = Dict([
@@ -71,17 +60,17 @@ pars = Dict([
         "inclusion" => 0.0,
         "coopFreq" => 0.0,
     ])
-nruns = fill_inputs(10,pars, 0)
+nruns = fill_inputs(range,pars, 0)
 
 for w in workers() # start tasks on the workers to process requests in parallel
     remote_do(run_worker, w, inputs, results)
 end
 
-file = "datacollect_10.csv"
+file = "datacollect_100.csv"
     cols = push!(sort(collect(keys(pars))),
                  ["pn", "pr"]...)
     dat = DataFrame(Dict([(c, Any[]) for c in cols]))
-t
+
 for sim in 1:nruns
     # get results from parallel jobs
     flush(stdout)
@@ -96,3 +85,4 @@ end#hmap(results, 8, "Cooperation Frequencies")
 #data2 = currentDict["matr"]
 #diff = data[:, :, 8] - data2[:, :, 1]
 #hmap(diff, 10, 1)
+
