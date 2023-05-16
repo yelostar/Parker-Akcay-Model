@@ -8,7 +8,7 @@ using CSV
 using Distributed
 backend(:plotly)
 
-addprocs(50) 
+addprocs(40) 
 @everywhere include("ONS_Fixed_Links.jl")
 
 @everywhere function run_worker(inputs, results)
