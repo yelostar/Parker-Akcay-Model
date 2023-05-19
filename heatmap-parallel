@@ -11,7 +11,7 @@ using Distributed
 
 function dataRead(data, range, index::Int)
     df = CSV.read(data, DataFrame, delim=",")
-    df = df[!, [4, 6, 1, 2, 5, 7, 3]]
+    df = df[!, [6, 9, 2, 3, 7, 8, 10, 4, 5, 1]]
     sort!(df, [:pn, :pr])
     print(df)
     dfData = Matrix{Float64}(df)
@@ -37,5 +37,4 @@ function hmap(data, range::Int, index::Int, titles)
     gui(p)
 end
 
-hmap("datacollect_akcay_10_2.csv", 10, 3, "Cooperation Frequencies")
-#df = CSV.read("datacollect_akcay_10.csv", DataFrame, delim=",")
+hmap("datacollect_10.csv", 10, 7, "Cooperation Frequencies")
