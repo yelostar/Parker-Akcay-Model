@@ -3,14 +3,15 @@ using StatsBase
 using FileIO
 using ArgParse
 using Plots
+backend(:plotly)
 using DataFrames
 using CSV
 using Distributed
-backend(:plotly)
+
 
 function dataRead(data, range, index::Int)
     df = CSV.read(data, DataFrame, delim=",")
-    df = df[!, [6, 9, 2, 3, 7, 8, 10, 4, 5, 1]]
+    df = df[!, [4, 6, 1, 2, 5, 7, 3]]
     sort!(df, [:pn, :pr])
     print(df)
     dfData = Matrix{Float64}(df)
@@ -32,8 +33,9 @@ function hmap(data, range::Int, index::Int, titles)
         push!(x_axis, (string(round((0.05*i/range); digits = 4))))
         push!(y_axis, (string(round((1*i/range); digits = 3))))
     end
-    p = heatmap(x_axis, y_axis, dataArr[:, :, 1]; title = titles,)
+    p = heatmap(x_axis, y_axis, dataArr[:, :, 1]; title = titles, xlabel="PR",ylabel="PN", clim=(0,1))
     gui(p)
 end
 
-hmap("datacollect_10.csv", 10, 3, "Cooperation Frequencies")
+hmap("datacollect_akcay_10_2.csv", 10, 3, "Cooperation Frequencies")
+#df = CSV.read("datacollect_akcay_10.csv", DataFrame, delim=",")
