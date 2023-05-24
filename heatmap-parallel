@@ -11,8 +11,10 @@ using Distributed
 
 function dataRead(data, range, index::Int)
     df = CSV.read(data, DataFrame, delim=",")
-    df = df[!, [6, 9, 2, 3, 7, 8, 10, 4, 5, 1]]
-    sort!(df, [:pn, :pr])
+    df = df[!, [2, 3, 4, 5, 8, 9, 10, 6, 7, 1]] #used for soring by ben/cl
+    #df = df[!, [6, 9, 2, 3, 7, 8, 10, 4, 5, 1]] used for when sorting by pn/r
+    #sort!(df, [:pn, :pr])
+    sort!(df, [:ben, :cl])
     print(df)
     dfData = Matrix{Float64}(df)
     dataArr = zeros(range, range, 1) #transforms [range^2 * 10] arr to [range, range, 1] arr
@@ -25,16 +27,18 @@ function dataRead(data, range, index::Int)
 end
 
 function hmap(data, range::Int, index::Int, titles) 
-    #indexes: pn       pr       coopFreq   degree    pnc_end    pnd_end    pr_end     distance  inclusion  assortment 
+    #indexes : yidx       xidx       coopFreq   degree    pnc_end    pnd_end    pr_end     distance  inclusion  assortment 
     dataArr = dataRead(data, range, index)
     x_axis = String[]
     y_axis = String[]
     for(i) in 1:range #PNC/PND times 10
-        push!(x_axis, (string(round((0.05*i/range); digits = 4))))
-        push!(y_axis, (string(round((1*i/range); digits = 3))))
+        push!(x_axis, (string(round((0.4*i/range); digits = 4))))
+        push!(y_axis, (string(round((10*i/range); digits = 3))))
     end
-    p = heatmap(x_axis, y_axis, dataArr[:, :, 1]; title = titles, xlabel="PR",ylabel="PN", clim=(0,1))
+    p = heatmap(x_axis, y_axis, dataArr[:, :, 1]; title = titles, xlabel="CL",ylabel="BEN", clim=(0,0.2))
     gui(p)
 end
 
-hmap("datacollect_10.csv", 10, 7, "Cooperation Frequencies")
+hmap("fig_4_20.csv", 20, 7, "PR")
+#df = CSV.read("fig_4_20.csv", DataFrame, delim=",")
+#print(df)
