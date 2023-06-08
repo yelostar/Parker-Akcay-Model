@@ -26,7 +26,7 @@ function dataRead(data, range, index::Int)
     dataArr
 end
 
-function hmap(data, range::Int, index::Int, titles) 
+function hmap(data::String, range::Int, index::Int, titles::String, cLow::Float64, chI::Float64) 
     #indexes : yidx       xidx       coopFreq   degree    pnc_end    pnd_end    pr_end     distance  inclusion  assortment 
     dataArr = dataRead(data, range, index)
     x_axis = String[]
@@ -35,10 +35,10 @@ function hmap(data, range::Int, index::Int, titles)
         push!(x_axis, (string(round((0.4*i/range); digits = 4))))
         push!(y_axis, (string(round((10*i/range); digits = 3))))
     end
-    p = heatmap(x_axis, y_axis, dataArr[:, :, 1]; title = titles, xlabel="CL",ylabel="BEN", clim=(0,0.2))
+    p = heatmap(x_axis, y_axis, dataArr[:, :, 1]; title = titles, xlabel="CL",ylabel="BEN", clim=(cLow,chI))
     gui(p)
 end
 
-hmap("fig_4_20.csv", 20, 7, "PR")
+hmap("sup_6_no_pnd.csv", 20, 7, "PR", 0.0, 0.1)
 #df = CSV.read("fig_4_20.csv", DataFrame, delim=",")
 #print(df)
