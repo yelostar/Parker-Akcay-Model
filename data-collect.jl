@@ -16,7 +16,7 @@ addprocs(40)
     while true
         pard = take!(inputs)
         println(pard["ben"], " ", pard["cl"], " in pard")
-        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pnc=0.5, pnd=0.5, pr=0.0001, muP=0.001, delta=0.5, reps=10)
+        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pnc=0.5, pnd=0.5, pr=0.0001, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
         #println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
         Keys = ["pnc_end","pnd_end","pr_end","degree","assortment","distance","inclusion","coopFreq"]
         temp = Dict(zip(Keys, coopFreq))
@@ -66,7 +66,7 @@ for w in workers() # start tasks on the workers to process requests in parallel
     remote_do(run_worker, w, inputs, results)
 end
 
-file = "sup_6_no_pnd.csv"
+file = "fig_4_small_sigmapn.csv"
     cols = push!(sort(collect(keys(pars))),
                  ["ben", "cl"]...)
     dat = DataFrame(Dict([(c, Any[]) for c in cols]))
