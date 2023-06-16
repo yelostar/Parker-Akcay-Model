@@ -17,6 +17,7 @@ mutable struct NetworkParameters
     meanAssortment::Float64
     meanCoopDefDistance::Float64
     meanDistInclusion::Float64
+    meanFitness::Float64
 
     #Node characteristics
     popPNC::Array{Float64, 1}
@@ -73,7 +74,7 @@ mutable struct NetworkParameters
         muS = .001 #changing strategies
         #delta = 0.1 #EDIT 0.5
 
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPR, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, sigmapn, sigmapr)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPR, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, sigmapn, sigmapr)
     end
 end
 
@@ -113,11 +114,13 @@ end
 function degrees(network::NetworkParameters)
     degTotal = 0
     assmtTotal = 0
-    coopCount = 0.0
+    fitnessTotal = 0
+    coopCount = 0.0 #unnecessary?
     for(i) in 1:network.popSize
         if(network.popStrategies[i]==1)
             coopCount+=1.0
         end
+        fitnessTotal+=network.popFitness[i]
     end
     coopCount = coopCount/network.popSize
     for(i) in 1:network.popSize
@@ -141,8 +144,10 @@ function degrees(network::NetworkParameters)
         end
     end
     degTotal /= network.popSize
+    fitnessTotal /= network.popSize
     assmtTotal /= network.popSize
     network.meanDegree += degTotal
+    network.meanFitness += fitnessTotal
     network.meanAssortment += assmtTotal
 end
 
@@ -305,7 +310,7 @@ function getDegree(network::NetworkParameters) #made less efficient by 2 in edge
 end
 
 function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pnc::Float64=0.5, pnd::Float64=0.5, pr::Float64=0.01, muP::Float64=0.001, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
-    dataArray = zeros(8)
+    dataArray = zeros(9)
     repSims = 100
     for(x) in 1:repSims
 
@@ -342,6 +347,7 @@ function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.
         network.meanCoopFreq /= (network.numGens*0.8)
         network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
         network.meanDistInclusion /= (network.popSize*network.numGens*0.8)
+        network.meanFitness /= (network.numGens*0.8)
 
         dataArray[1] += network.meanProbNeighborCoop
         dataArray[2] += network.meanProbNeighborDef
@@ -351,6 +357,7 @@ function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.
         dataArray[6] += network.meanCoopDefDistance
         dataArray[7] += network.meanDistInclusion
         dataArray[8] += network.meanCoopFreq
+        dataArray[9] += network.meanFitness
     end
     dataArray[:] ./= Float64(repSims)
     #EDIT NAME
@@ -358,7 +365,7 @@ function runSims(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.
 end
 
 function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pnc::Float64=0.5, pnd::Float64=0.5, pr::Float64=0.01, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
-    dataArray = zeros(8)
+    dataArray = zeros(9)
     repSims = reps
     for(x) in 1:repSims
 
@@ -396,6 +403,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         network.meanCoopFreq /= (network.numGens*0.8)
         network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
         network.meanDistInclusion /= (network.popSize*network.numGens*0.8)
+        network.meanFitness /= (network.numGens*0.8)
 
         dataArray[1] += network.meanProbNeighborCoop
         dataArray[2] += network.meanProbNeighborDef
@@ -405,6 +413,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[6] += network.meanCoopDefDistance
         dataArray[7] += network.meanDistInclusion
         dataArray[8] += network.meanCoopFreq
+        dataArray[9] += network.meanFitness
     end
     dataArray[:] ./= Float64(repSims)
     return dataArray
