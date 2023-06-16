@@ -11,7 +11,7 @@ using Distributed
 
 function dataRead(data, range, index::Int)
     df = CSV.read(data, DataFrame, delim=",")
-    df = df[!, [2, 3, 4, 5, 8, 9, 10, 6, 7, 1]] #used for soring by ben/cl
+    df = df[!, [2, 3, 4, 5, 7, 9, 10, 11, 6, 8, 1]] #used for soring by ben/cl, including fitness
     #df = df[!, [6, 9, 2, 3, 7, 8, 10, 4, 5, 1]] used for when sorting by pn/r
     #sort!(df, [:pn, :pr])
     sort!(df, [:ben, :cl])
@@ -23,11 +23,12 @@ function dataRead(data, range, index::Int)
             dataArr[i, j, 1] = dfData[range*(i-1)+j, index]
         end
     end
+    #print(dataArr)
     dataArr
 end
 
 function hmap(data::String, range::Int, index::Int, titles::String, cLow::Float64, chI::Float64) 
-    #indexes : yidx       xidx       coopFreq   degree    pnc_end    pnd_end    pr_end     distance  inclusion  assortment 
+    #indexes : yidx       xidx       coopFreq   degree    fitness   pnc_end    pnd_end    pr_end     distance  inclusion  assortment 
     dataArr = dataRead(data, range, index)
     x_axis = String[]
     y_axis = String[]
@@ -39,6 +40,6 @@ function hmap(data::String, range::Int, index::Int, titles::String, cLow::Float6
     gui(p)
 end
 
-hmap("sup_6_no_pnd.csv", 20, 7, "PR", 0.0, 0.1)
-#df = CSV.read("fig_4_20.csv", DataFrame, delim=",")
+hmap("fitness_test.csv", 20, 5, "Fitness", 0.0095, 0.012) 
+#df = CSV.read("fitness_test.csv", DataFrame, delim=",")
 #print(df)
