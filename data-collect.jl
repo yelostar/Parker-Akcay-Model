@@ -16,7 +16,7 @@ addprocs(40)
     while true
         pard = take!(inputs)
         println(pard["ben"], " ", pard["cl"], " in pard")
-        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pnc=0.5, pnd=0.5, pr=0.0001, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
+        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pnc=0.5, pnd=0.5, pr=0.0001, muP=0.001, delta=0.5, sigmapn=0.01, sigmapr=0.01, reps=10)
         #println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
         Keys = ["pnc_end","pnd_end","pr_end","degree","assortment","distance","inclusion","coopFreq","fitness"]
         temp = Dict(zip(Keys, coopFreq))
@@ -43,7 +43,7 @@ function fill_inputs(range,pars, nruns)
 end
 
 #notebook for running below
-range = 3        
+range = 20        
 inputs  = RemoteChannel(()->Channel{Dict}(range*range)) #2*nsets*maximum(pars["num_crossings"])
 results = RemoteChannel(()->Channel{Dict}(range*range))
         
@@ -67,7 +67,7 @@ for w in workers() # start tasks on the workers to process requests in parallel
     remote_do(run_worker, w, inputs, results)
 end
 
-file = "fitness_test.csv"
+file = "sup_6_pnc_d.csv"
     cols = push!(sort(collect(keys(pars))),
                  ["ben", "cl"]...)
     dat = DataFrame(Dict([(c, Any[]) for c in cols]))
@@ -80,3 +80,5 @@ for sim in 1:nruns
     push!(dat, Dict([(Symbol(k), resd[k]) for k in keys(resd)]))
     CSV.write(file, dat)
 end
+
+println("Data Collected")
