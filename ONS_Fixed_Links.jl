@@ -224,12 +224,12 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
         network.popPNC[child] = clamp(network.popPNC[child], 0, 1)
     end
 
-    network.popPND[child] = network.popPNC[child]
+    network.popPND[child] = network.popPND[parent]
 
-    #if(rand()<network.muP)
-    #    network.popPND[child] += randn()*network.sigmapn
-    #    network.popPND[child] = clamp(network.popPND[child], 0, 1)
-    #end
+    if(rand()<network.muP)
+        network.popPND[child] += randn()*network.sigmapn
+        network.popPND[child] = clamp(network.popPND[child], 0, 1)
+    end
 
     network.popPR[child] = network.popPR[parent]
     if(rand()<network.muP)
