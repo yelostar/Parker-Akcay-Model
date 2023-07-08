@@ -2,11 +2,9 @@ using JLD2
 using StatsBase
 using FileIO
 using ArgParse
-using Plots
 using DataFrames
 using CSV
 using Distributed
-backend(:plotly)
 
 addprocs(40) 
 @everywhere include("ONS_Fixed_Links.jl")
@@ -16,12 +14,12 @@ addprocs(40)
     while true
         pard = take!(inputs)
         println(pard["ben"], " ", pard["cl"], " in pard")
-        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pnc=0.5, pnd=0.5, pr=0.0001, muP=0.001, delta=0.5, sigmapn=0.01, sigmapr=0.01, reps=10)
+        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pn=0.5, pnd=true, pr=0.0001, prd=true, muP=0.01, delta=0.5, sigmapn=0.01, sigmapr=0.01, reps=10)
         #println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
-        Keys = ["pnc_end","pnd_end","pr_end","degree","assortment","distance","inclusion","coopFreq","fitness"]
+        Keys = ["pnc_end","pnd_end","prc_end","prd_end","degree","assortment","distance","inclusion","coopFreq","fitness"]
         temp = Dict(zip(Keys, coopFreq))
         temp = merge(pard, temp)
-        println(temp["ben"], " ", temp["cl"], " CF: ", temp["coopFreq"])
+        println(temp["ben"], " ", temp["cl"], " CF: ", round(temp["coopFreq"]; digits = 3), " PNC: ", round(temp["pnc_end"]; digits = 3), " PND: ", round(temp["pnd_end"]; digits = 3), " PRC: ", round(temp["prc_end"]; digits = 3), " PRD: ", round(temp["prd_end"]; digits = 3) )
         put!(results, temp)
     end
 end
@@ -53,7 +51,8 @@ pars = Dict([
         "cl" => 0.0,
         "pnc_end" => 0.0,
         "pnd_end" => 0.0,
-        "pr_end" => 0.0,
+        "prc_end" => 0.0,
+        "prd_end" => 0.0,
         "degree" => 0.0,
         "assortment" => 0.0,
         "distance" => 0.0,
@@ -67,7 +66,7 @@ for w in workers() # start tasks on the workers to process requests in parallel
     remote_do(run_worker, w, inputs, results)
 end
 
-file = "sup_6_pnc_d.csv"
+file = "sup_6_prd.csv"
     cols = push!(sort(collect(keys(pars))),
                  ["ben", "cl"]...)
     dat = DataFrame(Dict([(c, Any[]) for c in cols]))
