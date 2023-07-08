@@ -11,9 +11,9 @@ using Distributed
 
 function dataRead(data, range, index::Int)
     df = CSV.read(data, DataFrame, delim=",")
-    df = df[!, [2, 3, 4, 5, 7, 9, 10, 11, 6, 8, 1]] #used for soring by ben/cl, including fitness
-    #df = df[!, [6, 9, 2, 3, 7, 8, 10, 4, 5, 1]] used for when sorting by pn/r
-    #sort!(df, [:pn, :pr])
+    df = df[!, [2, 3, 4, 5, 7, 9, 10, 11, 12, 6, 8, 1]] #used for soring by ben/cl, including fitness & prd
+    #df = df[!, [6, 9, 2, 3, 7, 8, 10, 4, 5, 1]] #used for when sorting by pn/r
+    #sort!(df, [:pn, :pr]) #used for when sorting by pn/r
     sort!(df, [:ben, :cl])
     print(df)
     dfData = Matrix{Float64}(df)
@@ -28,7 +28,7 @@ function dataRead(data, range, index::Int)
 end
 
 function hmap(data::String, range::Int, index::Int, titles::String, cLow::Float64, chI::Float64) 
-    #indexes : yidx       xidx       coopFreq   degree    fitness   pnc_end    pnd_end    pr_end     distance  inclusion  assortment 
+    #indexes : 1 yidx   2 xidx   3 coopFreq   4 degree   5 fitness  6 pnc_end   7 pnd_end   8 prc_end  9 prd_end  10 distance  11 inclusion  12 assortment 
     dataArr = dataRead(data, range, index)
     x_axis = String[]
     y_axis = String[]
@@ -40,6 +40,14 @@ function hmap(data::String, range::Int, index::Int, titles::String, cLow::Float6
     gui(p)
 end
 
-hmap("fitness_test.csv", 20, 5, "Fitness", 0.0095, 0.012) 
+file = "sup_6_pnc_d_fixed.csv"
+hmap(file, 20, 3, "Coop Freq", 0.0, 1.0) 
+hmap(file, 20, 6, "PNC", 0.0, 1.0) 
+hmap(file, 20, 7, "PND", 0.0, 0.6) 
+hmap(file, 20, 8, "PRC", 0.0, 1.0) 
+hmap(file, 20, 9, "PRD", 0.0, 0.2) 
+hmap(file, 20, 4, "Degree", 1.0, 50.0) 
+
+
 #df = CSV.read("fitness_test.csv", DataFrame, delim=",")
 #print(df)
