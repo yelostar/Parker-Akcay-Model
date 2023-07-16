@@ -4,6 +4,7 @@ using JLD2
 using ArgParse
 using StatsBase
 using FileIO
+using Graphs
 #using Plots
 
 mutable struct NetworkParameters
@@ -19,6 +20,8 @@ mutable struct NetworkParameters
     meanCoopDefDistance::Float64
     meanDistInclusion::Float64
     meanFitness::Float64
+    meanShortestPaths::Float64
+    meanConnComponents::Float64
 
     #Node characteristics
     popPNC::Array{Float64, 1}
@@ -78,7 +81,7 @@ mutable struct NetworkParameters
         linkCost = cL
         muS = muP #changing strategies
 
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, sigmapn, sigmapr)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, sigmapn, sigmapr)
     end
 end
 
@@ -293,8 +296,8 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
                     end
                 end
                 #if(rand() < network.popPR[child]) #original code
-                #    network.edgeMatrix[i, child] = 2
-                #    network.edgeMatrix[child, i] = 2
+                network.edgeMatrix[i, child] = 1
+                network.edgeMatrix[child, i] = 1
                 #end
             end
         end
@@ -344,6 +347,35 @@ function getDegree(network::NetworkParameters) #made less efficient by 2 in edge
     degGetter
 end
 
+function graphCalc(network::NetworkParameters) #computes all calculations involving Graphs.jl, including shortest paths & connected components
+    edgeGraph = Graph(network.edgeMatrix)
+
+    allPath = 0.0
+    disconn = 0 #keeps track of disconnected components
+    for(i) in 1:network.popSize
+        dsp = dijkstra_shortest_paths(edgeGraph, i)
+        paths = dsp.dists
+        undefs = zeros(Int, 0) #keeps track of infinite and zero distances between nodes
+        for(j) in 1:(size(paths)[1])
+            if(paths[j] > (network.popSize+1) || paths[j] == 0)
+                push!(undefs, j)
+            end
+        end
+        if(size(undefs)==size(paths)) #if all shortest paths are zero or infinite, disconn increments
+            disconn += 1
+        else
+            for(k) in 1:size(undefs)[1]
+                deleteat!(paths, undefs[k]) #removes all infinite and zero distances from paths
+                undefs .-= 1 #avoids index out of bounds
+            end
+            allPath += mean(paths)
+        end
+    end
+    network.meanShortestPaths += (allPath / (network.popSize-disconn))
+
+    network.meanConnComponents += size(connected_components(edgeGraph))[1] #connected_components(edgeGraph) returns a vector of vectors of each connected component
+end
+
 function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(10) 
     repSims = reps
@@ -369,6 +401,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
                 probNeighbor(network)
                 probRandom(network)
                 degrees(network)
+                graphCalc(network)
                 #distance(network)
             end
 
@@ -385,6 +418,8 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
         network.meanDistInclusion /= (network.popSize*network.numGens*0.8)
         network.meanFitness /= (network.numGens*0.8)
+        network.meanShortestPath /= (network.numGens*0.8)
+        network.meanConnComponents /= (network.numGens*0.8)
 
         dataArray[1] += network.meanProbNeighborCoop
         dataArray[2] += network.meanProbNeighborDef
@@ -396,6 +431,8 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[8] += network.meanDistInclusion
         dataArray[9] += network.meanCoopFreq
         dataArray[10] += network.meanFitness
+        dataArray[11] += network.meanShortestPath
+        dataArray[12] += network.meanConnComponents
     end
     dataArray[:] ./= Float64(repSims)
     return dataArray
@@ -410,3 +447,6 @@ runSims(0.1, 1.0)
 @profile runSims(0.1, 1.0)
 #Profile.print()
 #runSims(0.1, 1.0)=#
+
+#test = Graph(edgeMatrix)
+#gplot(test, nodelabel=1:10)
