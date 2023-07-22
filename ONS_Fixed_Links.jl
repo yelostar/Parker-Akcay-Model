@@ -219,7 +219,7 @@ end
 
 function findMom(network::NetworkParameters, kID::Int64)
     network.popFitness[kID] = 0
-    fitWeights = weights(network.popFitness)
+    fitWeights = StatsBase.weights(network.popFitness)
     momIndex = sample(1:network.popSize, fitWeights)
     momIndex
 end
@@ -296,8 +296,8 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
                     end
                 end
                 #if(rand() < network.popPR[child]) #original code
-                network.edgeMatrix[i, child] = 1
-                network.edgeMatrix[child, i] = 1
+                #network.edgeMatrix[i, child] = 1
+                #network.edgeMatrix[child, i] = 1
                 #end
             end
         end
@@ -377,7 +377,7 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 end
 
 function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
-    dataArray = zeros(10) 
+    dataArray = zeros(12) 
     repSims = reps
     for(x) in 1:repSims
 
@@ -418,7 +418,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
         network.meanDistInclusion /= (network.popSize*network.numGens*0.8)
         network.meanFitness /= (network.numGens*0.8)
-        network.meanShortestPath /= (network.numGens*0.8)
+        network.meanShortestPaths /= (network.numGens*0.8)
         network.meanConnComponents /= (network.numGens*0.8)
 
         dataArray[1] += network.meanProbNeighborCoop
@@ -431,7 +431,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[8] += network.meanDistInclusion
         dataArray[9] += network.meanCoopFreq
         dataArray[10] += network.meanFitness
-        dataArray[11] += network.meanShortestPath
+        dataArray[11] += network.meanShortestPaths
         dataArray[12] += network.meanConnComponents
     end
     dataArray[:] ./= Float64(repSims)
