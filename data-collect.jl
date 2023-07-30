@@ -14,7 +14,7 @@ addprocs(40)
     while true
         pard = take!(inputs)
         println(pard["ben"], " ", pard["cl"], " in pard")
-        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pn=0.5, pnd=true, pr=0.0001, prd=false, muP=0.01, delta=0.5, sigmapn=0.01, sigmapr=0.01, reps=10)
+        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pn=0.5, pnd=true, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
         #println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
         Keys = ["pnc_end","pnd_end","prc_end","prd_end","degree","assortment","distance","inclusion","coopFreq","fitness","shortestPath","connComponents"]
         temp = Dict(zip(Keys, coopFreq))
@@ -41,45 +41,50 @@ function fill_inputs(range,pars, nruns)
 end
 
 #notebook for running below
-range = 20        
-inputs  = RemoteChannel(()->Channel{Dict}(range*range)) #2*nsets*maximum(pars["num_crossings"])
-results = RemoteChannel(()->Channel{Dict}(range*range))
-        
-vals_arr = Array{Tuple}
-pars = Dict([
-        "ben" => 0.0,
-        "cl" => 0.0,
-        "pnc_end" => 0.0,
-        "pnd_end" => 0.0,
-        "prc_end" => 0.0,
-        "prd_end" => 0.0,
-        "degree" => 0.0,
-        "assortment" => 0.0,
-        "distance" => 0.0,
-        "inclusion" => 0.0,
-        "coopFreq" => 0.0,
-        "fitness" => 0.0,
-        "shortestPath" => 0.0,
-        "connComponents" => 0.0,
-    ])
-nruns = fill_inputs(range,pars, 0)
+@time begin
+    range = 20        
+    inputs  = RemoteChannel(()->Channel{Dict}(range*range)) #2*nsets*maximum(pars["num_crossings"])
+    results = RemoteChannel(()->Channel{Dict}(range*range))
+            
+    vals_arr = Array{Tuple}
+    pars = Dict([
+            "ben" => 0.0,
+            "cl" => 0.0,
+            "pnc_end" => 0.0,
+            "pnd_end" => 0.0,
+            "prc_end" => 0.0,
+            "prd_end" => 0.0,
+            "degree" => 0.0,
+            "assortment" => 0.0,
+            "distance" => 0.0,
+            "inclusion" => 0.0,
+            "coopFreq" => 0.0,
+            "fitness" => 0.0,
+            "shortestPath" => 0.0,
+            "connComponents" => 0.0,
+        ])
+    nruns = fill_inputs(range,pars, 0)
 
-for w in workers() # start tasks on the workers to process requests in parallel
-    remote_do(run_worker, w, inputs, results)
+    for w in workers() # start tasks on the workers to process requests in parallel
+        remote_do(run_worker, w, inputs, results)
+    end
+
+
+    file = "test_time.csv"
+        cols = push!(sort(collect(keys(pars))),
+                    ["ben", "cl"]...)
+        dat = DataFrame(Dict([(c, Any[]) for c in cols]))
+
+    for sim in 1:nruns
+        # get results from parallel jobs
+        flush(stdout)
+        resd = take!(results)
+        # add to table (must convert dict keys to symbols) and save
+        push!(dat, Dict([(Symbol(k), resd[k]) for k in keys(resd)]))
+        CSV.write(file, dat)
+    end
+
 end
-
-file = "sup_6_pnd_graphs_fixed.csv"
-    cols = push!(sort(collect(keys(pars))),
-                 ["ben", "cl"]...)
-    dat = DataFrame(Dict([(c, Any[]) for c in cols]))
-
-for sim in 1:nruns
-    # get results from parallel jobs
-    flush(stdout)
-    resd = take!(results)
-    # add to table (must convert dict keys to symbols) and save
-    push!(dat, Dict([(Symbol(k), resd[k]) for k in keys(resd)]))
-    CSV.write(file, dat)
-end
-
 println("Data Collected")
+
+
