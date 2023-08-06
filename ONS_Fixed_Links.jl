@@ -31,6 +31,7 @@ mutable struct NetworkParameters
     popStrategies::Array{Int64, 1}
     popPayoff::Array{Float64, 1}
     popFitness::Array{Float64, 1}
+    popLocations::Array{Float64, 1}
 
     #structural variables
     numGens::Int64
@@ -45,14 +46,17 @@ mutable struct NetworkParameters
     muS::Float64
     muP::Float64    
     delta::Float64
+
+    #simulation determining
     pnd::Bool
     prd::Bool
+    distInherit::Bool
 
     #evolving links variables
     sigmapn::Float64
     sigmapr::Float64
 
-    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
+    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
 
         popSize = 100
         popPNC = zeros(Float64, popSize)
@@ -67,9 +71,25 @@ mutable struct NetworkParameters
         popStrategies[2:2:popSize] .= 1
         popFitness = zeros(Float64, popSize)
         popFitness[:] .= 1.0
+        
+        if(distInherit)
+            popLocations = zeros(Float64, popSize)
+            for(i) in 1:popSize
+                popLocations[i] = i #sets popLocations to [1, 2, ... popSize]
+            end
 
-        #edgeMatrix = zeros(Int64, 100, 100)
-        edgeMatrix=rand([0,1],(popSize,popSize))
+            edgeMatrix = zeros(popSize, popSize)
+            for(i) in 1:popSize
+                linkWeights = (((popLocations[i].-popLocations)).^(2)).^(-0.25) #inverse of the sqrt of distance between locations
+                links = zeros(Float64, Int(popSize/2))
+                sample!(popLocations, Weights(linkWeights), links, replace=false)
+                for(j) in links
+                    edgeMatrix[i, Int(j)] = 1    
+                end
+            end            
+        else
+            edgeMatrix=rand([0,1],(popSize,popSize))
+        end
         edgeMatrix = edgeMatrix .* transpose(edgeMatrix) #ensures that connections are reciprocated
         for(i) in 1:popSize
             edgeMatrix[i, i] = 0 #cannot connect with themself
@@ -81,7 +101,7 @@ mutable struct NetworkParameters
         linkCost = cL
         muS = muP #changing strategies
 
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, sigmapn, sigmapr)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, zeros(Float64, popSize), gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr)
     end
 end
 
@@ -263,12 +283,52 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
     else
         network.popPRD[child] = network.popPRC[child]
     end
-    #if(rand() < network.popPNC[child])
+    
+    if(network.distInherit)
+        distInherit(network, child, parent)
+    else
+        nonDistInherit(network, child, parent)
+    end
+
     network.edgeMatrix[parent, child] = 1
     network.edgeMatrix[child, parent] = 1
-    #end 
-    #Pb != 1 now
 
+end
+
+function distInherit(network::NetworkParameters, child::Int64, parent::Int64)
+    network.popLocations[child] = network.popLocations[parent]
+    for(i) in 1:network.popSize
+        if(i != child && network.edgeMatrix[i, child] == 0)
+            if(network.edgeMatrix[i, parent] != 0)
+                if(network.popStrategies[i] == 1) #PNC MODE
+                    if(rand() * (abs(network.popLocations[parent]-network.popLocations[i]))^(-0.5) < network.popPNC[child]) #prob to inherit multiplied by inverse square root of distance
+                        network.edgeMatrix[i, child] = 1
+                        network.edgeMatrix[child, i] = 1
+                    end
+                else
+                    if(rand() * (abs(network.popLocations[parent]-network.popLocations[i]))^(-0.5) < network.popPND[child]) #PND MODE
+                        network.edgeMatrix[i, child] = 1
+                        network.edgeMatrix[child, i] = 1
+                    end
+                end
+            else
+                if(network.popStrategies[i] == 1) #PRC MODE
+                    if(rand() * (abs(network.popLocations[parent]-network.popLocations[i]))^(-0.5) < network.popPRC[child])
+                        network.edgeMatrix[i, child] = 1
+                        network.edgeMatrix[child, i] = 1
+                    end
+                else
+                    if(rand() * (abs(network.popLocations[parent]-network.popLocations[i]))^(-0.5) < network.popPRD[child]) #PRD MODE
+                        network.edgeMatrix[i, child] = 1
+                        network.edgeMatrix[child, i] = 1
+                    end
+                end
+            end
+        end
+    end
+end
+
+function nonDistInherit(network::NetworkParameters, child::Int64, parent::Int64)
     for(i) in 1:network.popSize
         if(i != child && network.edgeMatrix[i, child] == 0)
             if(network.edgeMatrix[i, parent] != 0)
@@ -376,13 +436,13 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
     network.meanConnComponents += size(connected_components(edgeGraph))[1] #connected_components(edgeGraph) returns a vector of vectors of each connected component
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(12) 
     repSims = reps
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(B, C, D, CL, gen, pn, pnd, pr, prd, muP, delta, sigmapn, sigmapr) #if pnd/prd = true, then defector & cooperator probabilities will evolve separately for pn/pr
+        network = NetworkParameters(B, C, D, CL, gen, distInherit, pn, pnd, pr, prd, muP, delta, sigmapn, sigmapr) #if pnd/prd = true, then defector & cooperator probabilities will evolve separately for pn/pr
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
@@ -450,3 +510,4 @@ runSims(0.1, 1.0)
 
 #test = Graph(edgeMatrix)
 #gplot(test, nodelabel=1:10)
+#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=100000, pn=0.5, distInherit=true, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
