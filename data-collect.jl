@@ -14,7 +14,7 @@ addprocs(40)
     while true
         pard = take!(inputs)
         println(pard["ben"], " ", pard["cl"], " in pard")
-        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pn=0.5, pnd=true, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
+        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, pn=0.5, distInherit=true, pnd=true, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
         #println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
         Keys = ["pnc_end","pnd_end","prc_end","prd_end","degree","assortment","distance","inclusion","coopFreq","fitness","shortestPath","connComponents"]
         temp = Dict(zip(Keys, coopFreq))
@@ -70,7 +70,7 @@ end
     end
 
 
-    file = "test_time.csv"
+    file = "dist_inherit_fig_4_pnd.csv"
         cols = push!(sort(collect(keys(pars))),
                     ["ben", "cl"]...)
         dat = DataFrame(Dict([(c, Any[]) for c in cols]))
