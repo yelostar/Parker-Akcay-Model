@@ -80,7 +80,7 @@ mutable struct NetworkParameters
 
             edgeMatrix = zeros(popSize, popSize)
             for(i) in 1:popSize
-                linkWeights = (((popLocations[i].-popLocations)).^(2)).^(-0.25) #inverse of the sqrt of distance between locations
+                linkWeights = (abs.(popLocations.-popLocations[i])).^(-0.5) #inverse of the sqrt of distance between locations
                 links = zeros(Float64, Int(popSize/2))
                 sample!(popLocations, Weights(linkWeights), links, replace=false)
                 for(j) in links
@@ -297,32 +297,39 @@ end
 
 function distInherit(network::NetworkParameters, child::Int64, parent::Int64)
     network.popLocations[child] = network.popLocations[parent]
+    dists = (abs.(network.popLocations.-network.popLocations[child])).^(-0.5)
+    for(i) in 1:network.popSize
+        if(dists[i] < 1)
+            dists[i] = 1 #all distances 5 or under are set to 1
+        end
+    end
     for(i) in 1:network.popSize
         if(i != child && network.edgeMatrix[i, child] == 0)
             if(network.edgeMatrix[i, parent] != 0)
                 if(network.popStrategies[i] == 1) #PNC MODE
-                    if(rand() * (abs(network.popLocations[parent]-network.popLocations[i]))^(-0.5) < network.popPNC[child]) #prob to inherit multiplied by inverse square root of distance
+                    if(rand() * dists[i] < network.popPNC[child]) #prob to inherit multiplied by value for distance stored in dists
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 else
-                    if(rand() * (abs(network.popLocations[parent]-network.popLocations[i]))^(-0.5) < network.popPND[child]) #PND MODE
+                    if(rand() * dists[i] < network.popPND[child]) #PND MODE
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 end
             else
                 if(network.popStrategies[i] == 1) #PRC MODE
-                    if(rand() * (abs(network.popLocations[parent]-network.popLocations[i]))^(-0.5) < network.popPRC[child])
+                    if(rand() * dists[i] < network.popPRC[child])
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 else
-                    if(rand() * (abs(network.popLocations[parent]-network.popLocations[i]))^(-0.5) < network.popPRD[child]) #PRD MODE
+                    if(rand() * dists[i] < network.popPRD[child]) #PRD MODE
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 end
+ 
             end
         end
     end
