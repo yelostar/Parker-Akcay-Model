@@ -22,6 +22,8 @@ mutable struct NetworkParameters
     meanFitness::Float64
     meanShortestPaths::Float64
     meanConnComponents::Float64
+    meanConnCompSize::Float64
+    meanLargestConnComp::Float64
 
     #Node characteristics
     popPNC::Array{Float64, 1}
@@ -55,6 +57,9 @@ mutable struct NetworkParameters
     #evolving links variables
     sigmapn::Float64
     sigmapr::Float64
+
+    #distance inherit variables
+    distFactor::Float64
 
     function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
 
@@ -100,8 +105,8 @@ mutable struct NetworkParameters
         benefit = b
         linkCost = cL
         muS = muP #changing strategies
-
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, zeros(Float64, popSize), gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr)
+        distFactor = 0.95
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, zeros(Float64, popSize), gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
     end
 end
 
@@ -297,10 +302,10 @@ end
 
 function distInherit(network::NetworkParameters, child::Int64, parent::Int64)
     network.popLocations[child] = network.popLocations[parent]
-    dists = (abs.(network.popLocations.-network.popLocations[child])).^(-0.5)
+    dists = network.distFactor.^(abs.(network.popLocations.-network.popLocations[child]))
     for(i) in 1:network.popSize
         if(dists[i] < 1)
-            dists[i] = 1 #all distances 5 or under are set to 1
+            dists[i] = 1 #all 0 distances are set to 1
         end
     end
     for(i) in 1:network.popSize
@@ -440,11 +445,15 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
     end
     network.meanShortestPaths += (allPath / (network.popSize-disconn))
 
-    network.meanConnComponents += size(connected_components(edgeGraph))[1] #connected_components(edgeGraph) returns a vector of vectors of each connected component
+    cc = connected_components(edgeGraph) #connected_components(edgeGraph) returns a vector of vectors of each connected component
+    network.meanConnComponents += size(cc)[1] 
+    network.meanConnCompSize += mean(getfield.(size.(cc), 1))
+    network.meanLargestConnComp += maximum(getfield.(size.(cc), 1))
+
 end
 
 function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
-    dataArray = zeros(12) 
+    dataArray = zeros(14) 
     repSims = reps
     for(x) in 1:repSims
 
@@ -487,6 +496,8 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         network.meanFitness /= (network.numGens*0.8)
         network.meanShortestPaths /= (network.numGens*0.8)
         network.meanConnComponents /= (network.numGens*0.8)
+        network.meanConnCompSize /= (network.numGens*0.8)
+        network.meanLargestConnComp /= (network.numGens*0.8)
 
         dataArray[1] += network.meanProbNeighborCoop
         dataArray[2] += network.meanProbNeighborDef
@@ -500,6 +511,8 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[10] += network.meanFitness
         dataArray[11] += network.meanShortestPaths
         dataArray[12] += network.meanConnComponents
+        dataArray[13] += network.meanConnCompSize
+        dataArray[14] += network.meanLargestConnComp
     end
     dataArray[:] ./= Float64(repSims)
     return dataArray
@@ -517,4 +530,4 @@ runSims(0.1, 1.0)
 
 #test = Graph(edgeMatrix)
 #gplot(test, nodelabel=1:10)
-#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=100000, pn=0.5, distInherit=true, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
+#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=100000, pn=0.5, distInherit=false, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
