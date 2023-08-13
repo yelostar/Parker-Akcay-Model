@@ -10,7 +10,7 @@ using Distributed
 
 function dataRead(data, range, index::Int)
     df = CSV.read(data, DataFrame, delim=",")
-    df = df[!, [2, 3, 5, 6, 8, 10, 11, 12, 13, 14, 4, 7, 9, 1]] #used for soring by ben/cl, including graphCalcs
+    df = df[!, [2, 3, 5, 6, 8, 12, 13, 14, 15, 16, 4, 11, 10, 7, 9, 1]] #used for soring by ben/cl, including graphCalcs
     #df = df[!, [6, 9, 2, 3, 7, 8, 10, 4, 5, 1]] #used for when sorting by pn/r
     #sort!(df, [:pn, :pr]) #used for when sorting by pn/r
     sort!(df, [:ben, :cl])
@@ -27,7 +27,7 @@ function dataRead(data, range, index::Int)
 end
 
 function hmap(data::String, range::Int, index::Int, titles::String, cLow::Float64, chI::Float64) 
-    #indexes : 1 yidx   2 xidx   3 coopFreq   4 degree   5 fitness  6 pnc_end   7 pnd_end   8 prc_end  9 prd_end  10 shortestPath 11 connComponents 12 distance  13 inclusion  14 assortment 
+    #indexes : 1 yidx   2 xidx   3 coopFreq   4 degree   5 fitness  6 pnc_end   7 pnd_end   8 prc_end  9 prd_end  10 shortestPath 11 connComponents 12 meanCCSize 13 largestCC 14 distance  15 inclusion  16 assortment 
     dataArr = dataRead(data, range, index)
     x_axis = String[]
     y_axis = String[]
@@ -35,20 +35,26 @@ function hmap(data::String, range::Int, index::Int, titles::String, cLow::Float6
         push!(x_axis, (string(round((0.4*i/range); digits = 4))))
         push!(y_axis, (string(round((10*i/range); digits = 3))))
     end
-    p = heatmap(x_axis, y_axis, dataArr[:, :, 1]; title = titles, xlabel="CL",ylabel="BEN", clim=(cLow,chI))
+    p = heatmap(x_axis, y_axis,  dataArr[:, :, 1]; title = titles, xlabel="CL",ylabel="BEN", clim=(cLow,chI))
     gui(p)
 end
 
-file = "sup_6_pnd_graphs_fixed.csv"
+#c = cgrad(:inferno, scale = :log10),
+file = "sup_6_pnd_new_graphs.csv"
 hmap(file, 20, 3, "Coop Freq", 0.0, 1.0) 
 hmap(file, 20, 6, "PNC", 0.0, 1.0) 
 hmap(file, 20, 7, "PND", 0.0, 1.0) 
-hmap(file, 20, 8, "PRC", 0.0, 0.6) 
-hmap(file, 20, 9, "PRD", 0.0, 0.6) 
-hmap(file, 20, 4, "Degree", 1.0, 10.0) 
+hmap(file, 20, 8, "PRC", 0.0, 0.5) 
+hmap(file, 20, 9, "PRD", 0.0, 0.1) 
+hmap(file, 20, 4, "Degree", 1.0, 100.0) 
+
 hmap(file, 20, 10, "Mean Shortest Path", 1.0, 4.0) 
-hmap(file, 20, 11, "Connected Components", 1.0, 20.0) 
+hmap(file, 20, 11, "Connected Components", 1.0, 45.0) 
+hmap(file, 20, 12, "Mean Conn. Comp. Size", 1.0, 100.0) 
+hmap(file, 20, 13, "Largest Conn. Comp.", 10.0, 100.0) 
 
+hmap(file, 20, 6, "PN", 0.4, 0.6) 
+hmap(file, 20, 9, "PR", 0.0, 0.5) 
 
-#df = CSV.read("fitness_test.csv", DataFrame, delim=",")
+#df = CSV.read("sup_6_pnd_new_graphs.csv", DataFrame, delim=",")
 #print(df)
