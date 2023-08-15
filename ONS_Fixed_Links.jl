@@ -24,6 +24,7 @@ mutable struct NetworkParameters
     meanConnComponents::Float64
     meanConnCompSize::Float64
     meanLargestConnComp::Float64
+    meanDistConnection::Float64
 
     #Node characteristics
     popPNC::Array{Float64, 1}
@@ -61,7 +62,7 @@ mutable struct NetworkParameters
     #distance inherit variables
     distFactor::Float64
 
-    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
+    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, distFactor::Float64, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
 
         popSize = 100
         popPNC = zeros(Float64, popSize)
@@ -85,9 +86,9 @@ mutable struct NetworkParameters
 
             edgeMatrix = zeros(popSize, popSize)
             for(i) in 1:popSize
-                linkWeights = (abs.(popLocations.-popLocations[i])).^(-0.5) #inverse of the sqrt of distance between locations
-                links = zeros(Float64, Int(popSize/2))
-                sample!(popLocations, Weights(linkWeights), links, replace=false)
+                linkWeights = distFactor.^(min.(abs.(popLocations.-popLocations[i]), abs.(popLocations.-popLocations[i].-100),abs.(popLocations.-popLocations[i].+100))) #creates weighted list of locations based on distFactor
+                links = zeros(Float64, Int(popSize/2)) 
+                sample!(popLocations, Weights(linkWeights), links, replace=false) #picks 50 links for each individual with probabilities weighted by locations
                 for(j) in links
                     edgeMatrix[i, Int(j)] = 1    
                 end
@@ -105,8 +106,7 @@ mutable struct NetworkParameters
         benefit = b
         linkCost = cL
         muS = muP #changing strategies
-        distFactor = 0.95
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, zeros(Float64, popSize), gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, zeros(Float64, popSize), gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
     end
 end
 
@@ -152,6 +152,7 @@ function degrees(network::NetworkParameters)
     degTotal = 0
     assmtTotal = 0
     fitnessTotal = 0
+    connDistTotal = 0
     coopCount = 0.0 
     for(i) in 1:network.popSize
         if(network.popStrategies[i]==1)
@@ -162,10 +163,12 @@ function degrees(network::NetworkParameters)
     coopCount = coopCount/network.popSize
     for(i) in 1:network.popSize
         degCounter = 0.0
+        connDistCounter = 0.0
         assmtCounter = 0.0
         for(ii) in 1:network.popSize
             if(network.edgeMatrix[i, ii] != 0)
                 degCounter += 1.0
+                connDistCounter += min(abs(network.popLocations[i]-network.popLocations[ii]), abs.(network.popLocations[i]-network.popLocations[ii]-100),abs.(network.popLocations[i]-network.popLocations[ii]+100)) #adds distance between individuals' locations
                 for(iii) in 1:network.popSize
                     if(network.edgeMatrix[ii, iii] != 0 && network.edgeMatrix[i, iii] != 0)
                         assmtCounter += 1.0
@@ -174,6 +177,8 @@ function degrees(network::NetworkParameters)
             end
         end
         degTotal += degCounter
+        connDistTotal /= degCounter #divides sum of distances by total number of connections
+        connDistTotal += connDistCounter
         if(network.popStrategies[i]==1)
             assmtTotal+= (assmtCounter/degCounter)-(coopCount)
         else
@@ -181,11 +186,13 @@ function degrees(network::NetworkParameters)
         end
     end
     degTotal /= network.popSize
+    connDistTotal /= network.popSize
     fitnessTotal /= network.popSize
     assmtTotal /= network.popSize
     network.meanDegree += degTotal
     network.meanFitness += fitnessTotal
     network.meanAssortment += assmtTotal
+    network.meanDistConnection += connDistTotal
 end
 
 function distance(network::NetworkParameters)
@@ -302,13 +309,12 @@ end
 
 function distInherit(network::NetworkParameters, child::Int64, parent::Int64)
     network.popLocations[child] = network.popLocations[parent]
-    dists = network.distFactor.^(abs.(network.popLocations.-network.popLocations[child]))
+    dists = network.distFactor.^(min.(abs.(network.popLocations.-network.popLocations[child]), abs.(network.popLocations.-network.popLocations[child].-100),abs.(network.popLocations.-network.popLocations[child].+100))) #creates weighted list of locations based on distFactor    for(i) in 1:network.popSize
+
     for(i) in 1:network.popSize
         if(dists[i] < 1)
             dists[i] = 1 #all 0 distances are set to 1
         end
-    end
-    for(i) in 1:network.popSize
         if(i != child && network.edgeMatrix[i, child] == 0)
             if(network.edgeMatrix[i, parent] != 0)
                 if(network.popStrategies[i] == 1) #PNC MODE
@@ -452,13 +458,13 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
-    dataArray = zeros(14) 
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, distFactor::Float64=1.0, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
+    dataArray = zeros(15) 
     repSims = reps
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(B, C, D, CL, gen, distInherit, pn, pnd, pr, prd, muP, delta, sigmapn, sigmapr) #if pnd/prd = true, then defector & cooperator probabilities will evolve separately for pn/pr
+        network = NetworkParameters(B, C, D, CL, gen, distInherit, distFactor, pn, pnd, pr, prd, muP, delta, sigmapn, sigmapr) #if pnd/prd = true, then defector & cooperator probabilities will evolve separately for pn/pr
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
@@ -498,6 +504,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         network.meanConnComponents /= (network.numGens*0.8)
         network.meanConnCompSize /= (network.numGens*0.8)
         network.meanLargestConnComp /= (network.numGens*0.8)
+        network.meanConnComponents /= (network.numGens*0.8)
 
         dataArray[1] += network.meanProbNeighborCoop
         dataArray[2] += network.meanProbNeighborDef
@@ -513,6 +520,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[12] += network.meanConnComponents
         dataArray[13] += network.meanConnCompSize
         dataArray[14] += network.meanLargestConnComp
+        dataArray[15] += network.meanDistConnection
     end
     dataArray[:] ./= Float64(repSims)
     return dataArray
@@ -530,4 +538,4 @@ runSims(0.1, 1.0)
 
 #test = Graph(edgeMatrix)
 #gplot(test, nodelabel=1:10)
-#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=100000, pn=0.5, distInherit=false, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
+#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=100000, pn=0.5, distInherit=true, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
