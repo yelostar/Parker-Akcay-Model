@@ -78,12 +78,11 @@ mutable struct NetworkParameters
         popFitness = zeros(Float64, popSize)
         popFitness[:] .= 1.0
         
+        popLocations = zeros(Float64, popSize)
+        for(i) in 1:popSize
+            popLocations[i] = i #sets popLocations to [1, 2, ... popSize]
+        end
         if(distInherit)
-            popLocations = zeros(Float64, popSize)
-            for(i) in 1:popSize
-                popLocations[i] = i #sets popLocations to [1, 2, ... popSize]
-            end
-
             edgeMatrix = zeros(popSize, popSize)
             for(i) in 1:popSize
                 linkWeights = distFactor.^(min.(abs.(popLocations.-popLocations[i]), abs.(popLocations.-popLocations[i].-100),abs.(popLocations.-popLocations[i].+100))) #creates weighted list of locations based on distFactor
@@ -106,7 +105,7 @@ mutable struct NetworkParameters
         benefit = b
         linkCost = cL
         muS = muP #changing strategies
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, zeros(Float64, popSize), gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, popLocations, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
     end
 end
 
@@ -538,5 +537,5 @@ runSims(0.1, 1.0)
 
 #test = Graph(edgeMatrix)
 #gplot(test, nodelabel=1:10)
-a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=1000, pn=0.5, distInherit=false, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
-println(a)
+#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=1000, pn=0.5, distInherit=false, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#println(a)
