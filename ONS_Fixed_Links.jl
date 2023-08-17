@@ -150,7 +150,7 @@ end
 
 function degrees(network::NetworkParameters)
     degTotal = 0
-    assmtTotal = 0
+    #assmtTotal = 0
     fitnessTotal = 0
     connDistTotal = 0
     coopCount = 0.0 
@@ -164,34 +164,36 @@ function degrees(network::NetworkParameters)
     for(i) in 1:network.popSize
         degCounter = 0.0
         connDistCounter = 0.0
-        assmtCounter = 0.0
+        #assmtCounter = 0.0
         for(ii) in 1:network.popSize
             if(network.edgeMatrix[i, ii] != 0)
                 degCounter += 1.0
                 connDistCounter += min(abs(network.popLocations[i]-network.popLocations[ii]), abs.(network.popLocations[i]-network.popLocations[ii]-100),abs.(network.popLocations[i]-network.popLocations[ii]+100)) #adds distance between individuals' locations
-                for(iii) in 1:network.popSize
-                    if(network.edgeMatrix[ii, iii] != 0 && network.edgeMatrix[i, iii] != 0)
-                        assmtCounter += 1.0
-                    end
-                end
+                #for(iii) in 1:network.popSize
+                #    if(network.edgeMatrix[ii, iii] != 0 && network.edgeMatrix[i, iii] != 0)
+                #        assmtCounter += 1.0
+                #    end
+                #end
             end
         end
         degTotal += degCounter
-        connDistTotal /= degCounter #divides sum of distances by total number of connections
-        connDistTotal += connDistCounter
-        if(network.popStrategies[i]==1)
-            assmtTotal+= (assmtCounter/degCounter)-(coopCount)
-        else
-            assmtTotal+= (assmtCounter/degCounter)-(1-coopCount)
+        if(degCounter != 0) #prevents divide by 0
+            connDistCounter /= degCounter #divides sum of distances by total number of connections
         end
+        connDistTotal += connDistCounter
+        #if(network.popStrategies[i]==1)
+        #    assmtTotal+= (assmtCounter/degCounter)-(coopCount)
+        #else
+        #    assmtTotal+= (assmtCounter/degCounter)-(1-coopCount)
+        #end
     end
     degTotal /= network.popSize
     connDistTotal /= network.popSize
     fitnessTotal /= network.popSize
-    assmtTotal /= network.popSize
+    #assmtTotal /= network.popSize
     network.meanDegree += degTotal
     network.meanFitness += fitnessTotal
-    network.meanAssortment += assmtTotal
+    #network.meanAssortment += assmtTotal
     network.meanDistConnection += connDistTotal
 end
 
@@ -296,8 +298,9 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
         network.popPRD[child] = network.popPRC[child]
     end
     
+    network.popLocations[child] = network.popLocations[parent]
     if(network.distInherit)
-        distInherit(network, child, parent)
+        locInherit(network, child, parent)
     else
         nonDistInherit(network, child, parent)
     end
@@ -307,14 +310,11 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
 
 end
 
-function distInherit(network::NetworkParameters, child::Int64, parent::Int64)
-    network.popLocations[child] = network.popLocations[parent]
+function locInherit(network::NetworkParameters, child::Int64, parent::Int64)
+    
     dists = network.distFactor.^(min.(abs.(network.popLocations.-network.popLocations[child]), abs.(network.popLocations.-network.popLocations[child].-100),abs.(network.popLocations.-network.popLocations[child].+100))) #creates weighted list of locations based on distFactor    for(i) in 1:network.popSize
 
     for(i) in 1:network.popSize
-        if(dists[i] < 1)
-            dists[i] = 1 #all 0 distances are set to 1
-        end
         if(i != child && network.edgeMatrix[i, child] == 0)
             if(network.edgeMatrix[i, parent] != 0)
                 if(network.popStrategies[i] == 1) #PNC MODE
@@ -458,7 +458,7 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, distFactor::Float64=1.0, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(15) 
     repSims = reps
     for(x) in 1:repSims
@@ -504,7 +504,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         network.meanConnComponents /= (network.numGens*0.8)
         network.meanConnCompSize /= (network.numGens*0.8)
         network.meanLargestConnComp /= (network.numGens*0.8)
-        network.meanConnComponents /= (network.numGens*0.8)
+        network.meanDistConnection /= (network.numGens*0.8)
 
         dataArray[1] += network.meanProbNeighborCoop
         dataArray[2] += network.meanProbNeighborDef
@@ -538,4 +538,5 @@ runSims(0.1, 1.0)
 
 #test = Graph(edgeMatrix)
 #gplot(test, nodelabel=1:10)
-#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=100000, pn=0.5, distInherit=true, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=1000, pn=0.5, distInherit=false, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+println(a)
