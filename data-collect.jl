@@ -13,13 +13,12 @@ addprocs(40)
     include("ONS_Fixed_Links.jl")
     while true
         pard = take!(inputs)
-        println(pard["ben"], " ", pard["cl"], " in pard")
-        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, distInherit=true, distFactor=0.975, pn=0.5, pnd=false, pr=0.0001, prd=false, muP=0.01, delta=0.5, sigmapn=0.01, sigmapr=0.01, reps=10)
-        #println(pard["pn"], " ", pard["pr"], " CF: ", coopFreq[8])
+        println(pard["clratio"], " ", pard["distFactor"], " in pard")
+        coopFreq = runSimsReturn(; B=0.02/pard["clratio"], C=0.5, D=0.0, CL=10.0*pard["clratio"], gen=100000, distInherit=true, distFactor=pard["distFactor"], pn=0.5, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
         Keys = ["pnc_end","pnd_end","prc_end","prd_end","degree","assortment","distance","inclusion","coopFreq","fitness","shortestPath","connComponents","meanConnCompSize","largestConnComp","meanConnDistance"]
         temp = Dict(zip(Keys, coopFreq))
         temp = merge(pard, temp)
-        println(temp["ben"], " ", temp["cl"], " CF: ", round(temp["coopFreq"]; digits = 3), " PNC: ", round(temp["pnc_end"]; digits = 3), " PND: ", round(temp["pnd_end"]; digits = 3), " PRC: ", round(temp["prc_end"]; digits = 3), " PRD: ", round(temp["prd_end"]; digits = 3) )
+        println(round(0.02/temp["clratio"]; digits = 3), " ", 10.0*temp["clratio"], " ", temp["distFactor"], " CF: ", round(temp["coopFreq"]; digits = 3), " PNC: ", round(temp["pnc_end"]; digits = 3), " PND: ", round(temp["pnd_end"]; digits = 3), " PRC: ", round(temp["prc_end"]; digits = 3), " PRD: ", round(temp["prd_end"]; digits = 3), " ConnDist: ", round(temp["meanConnDistance"]; digits = 3) )
         put!(results, temp)
     end
 end
@@ -27,11 +26,11 @@ end
 function fill_inputs(range,pars, nruns)
     for(i) in 1:range #PNC/PND 
         for(j) in 1:range #PNR 
-            vals = (10*i/range, 0.4*j/range)
+            vals = (0.04*i/range, (0.75+0.25*j/range))
             temp = copy(pars)
-            temp["ben"] = vals[1]
-            temp["cl"] = vals[2]
-            println(temp["ben"], " ", temp["cl"], "into inputs")
+            temp["clratio"] = vals[1]
+            temp["distFactor"] = vals[2]
+            println(0.02/temp["clratio"], " ", 10.0*temp["clratio"], " ", temp["distFactor"], " into inputs")
             nruns+=1
             put!(inputs, temp)
             #vals_arr.push(vals)
@@ -48,8 +47,8 @@ end
             
     vals_arr = Array{Tuple}
     pars = Dict([
-            "ben" => 0.0,
-            "cl" => 0.0,
+            "clratio" => 0.0,
+            "distFactor" => 0.0,
             "pnc_end" => 0.0,
             "pnd_end" => 0.0,
             "prc_end" => 0.0,
@@ -73,9 +72,9 @@ end
     end
 
 
-    file = "dist_inherit_sup_6_no_pnd_aug_15.csv"
+    file = "fig_3_dist_no_pnd.csv"
         cols = push!(sort(collect(keys(pars))),
-                    ["ben", "cl"]...)
+                    ["clratio", "distFactor"]...)
         dat = DataFrame(Dict([(c, Any[]) for c in cols]))
 
     for sim in 1:nruns
