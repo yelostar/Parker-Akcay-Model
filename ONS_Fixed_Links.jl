@@ -25,6 +25,7 @@ mutable struct NetworkParameters
     meanConnCompSize::Float64
     meanLargestConnComp::Float64
     meanDistConnection::Float64
+    meanDistFactor::Float64
 
     #Node characteristics
     popPNC::Array{Float64, 1}
@@ -35,6 +36,7 @@ mutable struct NetworkParameters
     popPayoff::Array{Float64, 1}
     popFitness::Array{Float64, 1}
     popLocations::Array{Float64, 1}
+    popDistFactors::Array{Float64, 1}
 
     #structural variables
     numGens::Int64
@@ -54,15 +56,15 @@ mutable struct NetworkParameters
     pnd::Bool
     prd::Bool
     distInherit::Bool
+    distFactorEvol::Bool
 
     #evolving links variables
     sigmapn::Float64
     sigmapr::Float64
+    sigmadf::Float64
 
-    #distance inherit variables
-    distFactor::Float64
 
-    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, distFactor::Float64, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
+    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, distFactor::Float64, distFactorEvol::Bool, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64, sigmadf::Float64)
 
         popSize = 100
         popPNC = zeros(Float64, popSize)
@@ -77,6 +79,8 @@ mutable struct NetworkParameters
         popStrategies[2:2:popSize] .= 1
         popFitness = zeros(Float64, popSize)
         popFitness[:] .= 1.0
+        popDistFactors = zeros(Float64, popSize)
+        popDistFactors[:] .= distFactor
         
         popLocations = zeros(Float64, popSize)
         for(i) in 1:popSize
@@ -105,7 +109,7 @@ mutable struct NetworkParameters
         benefit = b
         linkCost = cL
         muS = muP #changing strategies
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, popLocations, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, popLocations, popDistFactors, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, distFactorEvol, sigmapn, sigmapr, sigmadf)
     end
 end
 
@@ -121,30 +125,29 @@ function coopRatio(network::NetworkParameters)
     network.meanCoopFreq += coopCount
 end
 
-function probNeighbor(network::NetworkParameters)
+function probInherit(network::NetworkParameters)
     pNCTotal = 0.0
     pNDTotal = 0.0
+    pRCTotal = 0.0
+    pRDTotal = 0.0
+    dfTotal = 0.0
     for(i) in 1:network.popSize
         pNCTotal += network.popPNC[i]
         pNDTotal += network.popPND[i]
+        pRCTotal += network.popPRC[i]
+        pRDTotal += network.popPRD[i]
+        dfTotal += network.popDistFactors[i]
     end
     pNCTotal /= network.popSize
     pNDTotal /= network.popSize
-    network.meanProbNeighborCoop += pNCTotal
-    network.meanProbNeighborDef += pNDTotal
-end
-
-function probRandom(network::NetworkParameters)
-    pRCTotal = 0.0
-    pRDTotal = 0.0
-    for(i) in 1:network.popSize
-        pRCTotal += network.popPRC[i]
-        pRDTotal += network.popPRD[i]
-    end
     pRCTotal /= network.popSize
     pRDTotal /= network.popSize
+    dfTotal  /= network.popSize
     network.meanProbRandomCoop += pRCTotal
     network.meanProbRandomDef += pRDTotal
+    network.meanProbNeighborCoop += pNCTotal
+    network.meanProbNeighborDef += pNDTotal
+    network.meanDistFactor += dfTotal
 end
 
 function degrees(network::NetworkParameters)
@@ -309,6 +312,13 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
         network.popPRD[child] = network.popPRC[child]
     end
     
+    if(network.distFactorEvol) #allows separate evolution of distFactor if true
+        if(rand()<network.muP)
+            network.popDistFactors[child] += randn()*network.sigmadf
+            network.popDistFactors[child] = clamp(network.popDistFactors[child], 0, 1)
+        end
+    end
+
     resolveLocs(network, child, parent) #updates locations, ensures each individual has a unique location
      
     if(network.distInherit)
@@ -324,7 +334,7 @@ end
 
 function locInherit(network::NetworkParameters, child::Int64, parent::Int64)
     
-    dists = network.distFactor.^(min.(abs.(network.popLocations.-network.popLocations[child]), abs.(network.popLocations.-network.popLocations[child].-network.popSize),abs.(network.popLocations.-network.popLocations[child].+network.popSize))) #creates weighted list of locations based on distFactor    for(i) in 1:network.popSize
+    dists = network.popDistFactors[child].^(min.(abs.(network.popLocations.-network.popLocations[child]), abs.(network.popLocations.-network.popLocations[child].-network.popSize),abs.(network.popLocations.-network.popLocations[child].+network.popSize))) #creates weighted list of locations based on distFactor    for(i) in 1:network.popSize
 
     for(i) in 1:network.popSize
         if(i != child && network.edgeMatrix[i, child] == 0)
@@ -470,13 +480,13 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
-    dataArray = zeros(15) 
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, distFactor::Float64=0.975, distFactorEvol::Bool=false, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, sigmadf::Float64=0.025, reps::Int64=50)
+    dataArray = zeros(16) 
     repSims = reps
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(B, C, D, CL, gen, distInherit, distFactor, pn, pnd, pr, prd, muP, delta, sigmapn, sigmapr) #if pnd/prd = true, then defector & cooperator probabilities will evolve separately for pn/pr
+        network = NetworkParameters(B, C, D, CL, gen, distInherit, distFactor, distFactorEvol, pn, pnd, pr, prd, muP, delta, sigmapn, sigmapr, sigmadf) #if pnd/prd = true, then defector & cooperator probabilities will evolve separately for pn/pr
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
@@ -492,8 +502,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
 
             if(g > (network.numGens * network.popSize / 5) && (g % network.popSize) == 0)
                 coopRatio(network)
-                probNeighbor(network)
-                probRandom(network)
+                probInherit(network)
                 degrees(network)
                 graphCalc(network)
                 #distance(network)
@@ -519,6 +528,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         network.meanConnCompSize /= (network.numGens*0.8)
         network.meanLargestConnComp /= (network.numGens*0.8)
         network.meanDistConnection /= (network.numGens*0.8)
+        network.meanDistFactor /= (network.numGens*0.8)
 
         dataArray[1] += network.meanProbNeighborCoop
         dataArray[2] += network.meanProbNeighborDef
@@ -535,6 +545,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[13] += network.meanConnCompSize
         dataArray[14] += network.meanLargestConnComp
         dataArray[15] += network.meanDistConnection
+        dataArray[16] += network.meanDistFactor
     end
     dataArray[:] ./= Float64(repSims)
     return dataArray
@@ -542,5 +553,5 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
     #save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=2000, pn=0.5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=5000, pn=0.5, distInherit=true, distFactor=0.975, distFactorEvol=true, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, sigmadf=0.01, reps=1)
 #println(a)
