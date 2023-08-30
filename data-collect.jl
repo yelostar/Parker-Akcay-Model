@@ -14,7 +14,7 @@ addprocs(40)
     while true
         pard = take!(inputs)
         println(pard["cl"], " ", pard["distFactor"], " in pard")
-        coopFreq = runSimsReturn(; B=2.0, C=0.5, D=0.0, CL=pard["cl"], gen=100000, distInherit=true, distFactor=pard["distFactor"], distFactorEvol=false, pn=0.5, pnd=true, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, sigmadf=0.01, reps=10)
+        coopFreq = runSimsReturn(; B=2.0, C=0.5, D=0.0, CL=pard["cl"], gen=100000, distInherit=true, distFactor=pard["distFactor"], pn=0.5, pnd=true, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=10)
         Keys = ["pnc_end","pnd_end","prc_end","prd_end","degree","assortment","distance","inclusion","coopFreq","fitness","shortestPath","connComponents","meanConnCompSize","largestConnComp","meanConnDistance"]
         temp = Dict(zip(Keys, coopFreq))
         temp = merge(pard, temp)
@@ -64,7 +64,6 @@ end
             "meanConnCompSize" => 0.0,
             "largestConnComp" => 0.0,
             "meanConnDistance" => 0.0,
-            "distFactor" => 0.0,
         ])
     nruns = fill_inputs(range,pars, 0)
 
