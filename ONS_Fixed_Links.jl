@@ -3,9 +3,7 @@
 using JLD2
 using ArgParse
 using StatsBase
-using FileIO
 using Graphs
-#using Plots
 
 mutable struct NetworkParameters
 
@@ -110,51 +108,18 @@ mutable struct NetworkParameters
 end
 
 #measurement functions
-function coopRatio(network::NetworkParameters)
-    coopCount = 0
-    for(i) in 1:network.popSize
-        if(network.popStrategies[i] == 1)
-            coopCount += 1
-        end
-    end
-    coopCount /= network.popSize
-    network.meanCoopFreq += coopCount
-end
-
+    
 function probInherit(network::NetworkParameters)
-    pNCTotal = 0.0
-    pNDTotal = 0.0
-    pRCTotal = 0.0
-    pRDTotal = 0.0
-    for(i) in 1:network.popSize
-        pNCTotal += network.popPNC[i]
-        pNDTotal += network.popPND[i]
-        pRCTotal += network.popPRC[i]
-        pRDTotal += network.popPRD[i]
-    end
-    pNCTotal /= network.popSize
-    pNDTotal /= network.popSize
-    pRCTotal /= network.popSize
-    pRDTotal /= network.popSize
-    network.meanProbRandomCoop += pRCTotal
-    network.meanProbRandomDef += pRDTotal
-    network.meanProbNeighborCoop += pNCTotal
-    network.meanProbNeighborDef += pNDTotal
+    network.meanProbRandomCoop += sum(network.popPRC)/network.popSize
+    network.meanProbRandomDef += sum(network.popPRD)/network.popSize
+    network.meanProbNeighborCoop += sum(network.popPNC)/network.popSize
+    network.meanProbNeighborDef += sum(network.popPND)/network.popSize
 end
 
 function degrees(network::NetworkParameters)
     degTotal = 0
     #assmtTotal = 0
-    fitnessTotal = 0
     connDistTotal = 0
-    coopCount = 0.0 
-    for(i) in 1:network.popSize
-        if(network.popStrategies[i]==1)
-            coopCount+=1.0
-        end
-        fitnessTotal+=network.popFitness[i]
-    end
-    coopCount = coopCount/network.popSize
     for(i) in 1:network.popSize
         degCounter = 0.0
         connDistCounter = 0.0
@@ -183,12 +148,12 @@ function degrees(network::NetworkParameters)
     end
     degTotal /= network.popSize
     connDistTotal /= network.popSize
-    fitnessTotal /= network.popSize
     #assmtTotal /= network.popSize
     network.meanDegree += degTotal
-    network.meanFitness += fitnessTotal
+    network.meanFitness += sum(network.popFitness)/network.popSize
     #network.meanAssortment += assmtTotal
     network.meanDistConnection += connDistTotal
+    network.meanCoopFreq += (sum(network.popStrategies))/network.popSize #replaces coopCount()
 end
 
 function distance(network::NetworkParameters)
@@ -395,16 +360,8 @@ function cooperate(network::NetworkParameters)
         if(network.popStrategies[i] == 1)
             B = network.benefit/degs[i]
             D = network.synergism/degs[i]
-
-            for(ii) in 1:network.popSize
-                if(network.edgeMatrix[i, ii] != 0)
-                    network.popPayoff[ii] += B
-                    if(network.popStrategies[ii] == 1)
-                        network.popPayoff[ii] += D/degs[ii]
-                    end
-                end
-            end
-
+            network.popPayoff.+= B.*network.edgeMatrix[i, :]
+            network.popPayoff.+= (D.*network.edgeMatrix[i, :].*network.popStrategies[ii]./degs)
             network.popPayoff[i] -= network.cost
         end
         network.popPayoff[i] -= network.linkCost * degs[i]
@@ -412,21 +369,14 @@ function cooperate(network::NetworkParameters)
 end
 
 function resolveFitnesses(network::NetworkParameters)
-    for(i) in 1:network.popSize
-        network.popFitness[i] = (1.0 + network.delta) ^ network.popPayoff[i]
-    end
+    network.popFitness.=(1.0 + network.delta).^network.popPayoff
     network.popPayoff[:] .= 0.0
 end
 
-function getDegree(network::NetworkParameters) #made less efficient by 2 in edgeMatrix; can use sum for 1/0 vals
+function getDegree(network::NetworkParameters) #2 in edgeMatrix removed
     degGetter = zeros(100)
     for(i) in 1:100
-        for(ii) in 1:100
-            if(network.edgeMatrix[i,ii] != 0)
-                degGetter[i] += 1
-            end
-        end
-        #degGetter[i] = sum(edgeMatrix[i,:])
+        degGetter[i] = sum(network.edgeMatrix[i, :])
     end
 
     degGetter
@@ -486,7 +436,6 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
             resolveFitnesses(network)
 
             if(g > (network.numGens * network.popSize / 5) && (g % network.popSize) == 0)
-                coopRatio(network)
                 probInherit(network)
                 degrees(network)
                 graphCalc(network)
@@ -536,5 +485,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
     #save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=2000, pn=0.5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#@time begin
+#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
 #println(a)
+#end
