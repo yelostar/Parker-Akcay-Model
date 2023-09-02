@@ -210,10 +210,17 @@ function death(network::NetworkParameters)
     deadID
 end
 
-function findMom(network::NetworkParameters, kID::Int64)
+function anyMom(network::NetworkParameters, kID::Int64)
     network.popFitness[kID] = 0
     fitWeights = StatsBase.weights(network.popFitness)
     momIndex = sample(1:network.popSize, fitWeights)
+    resolveLocs(network, kID, momIndex) #updates locations, ensures each individual has a unique location
+    momIndex
+end
+
+function neighborMom(network::NetworkParameters, kID::Int64)
+    fitWeights = StatsBase.weights([network.popFitness[kID%100+1], network.popFitness[(kID+98)%100+1]]) #index plus/minus one, loops around 100
+    momIndex = (kID + sample([-1, 1], fitWeights) + 99)%100 + 1 #have to use (idx +99)%100 + 1 to loop properly
     momIndex
 end
 
@@ -268,9 +275,7 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
     else
         network.popPRD[child] = network.popPRC[child]
     end
-    
-    resolveLocs(network, child, parent) #updates locations, ensures each individual has a unique location
-     
+         
     if(network.distInherit)
         locInherit(network, child, parent)
     else
@@ -415,7 +420,7 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, findMom::String="anyMom", distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(15) 
     repSims = reps
     for(x) in 1:repSims
@@ -427,7 +432,11 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         for(g) in 1:(network.numGens * network.popSize)
 
             childID = death(network)
-            parentID = findMom(network, childID)
+            if(findMom=="anyMom")
+                parentID = anyMom(network, childID)
+            elseif(findMom=="neighborMom")
+                parentID = neighborMom(network, childID)
+            end
             birth(network, childID, parentID)
             if(g > (20))
                 cooperate(network)
@@ -486,6 +495,6 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
 end
 
 #@time begin
-#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=2000, pn=0.5, findMom="anyMom", distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
 #println(a)
 #end
