@@ -220,7 +220,7 @@ end
 
 function neighborMom(network::NetworkParameters, kID::Int64)
     fitWeights = StatsBase.weights([network.popFitness[kID%100+1], network.popFitness[(kID+98)%100+1]]) #index plus/minus one, loops around 100
-    momIndex = (kID + sample([-1, 1], fitWeights) + 99)%100 + 1 #have to use (idx +99)%100 + 1 to loop properly
+    momIndex = (kID + sample([1, -1], fitWeights) + 99)%100 + 1 #have to use (idx +99)%100 + 1 to loop properly
     momIndex
 end
 
@@ -366,7 +366,7 @@ function cooperate(network::NetworkParameters)
             B = network.benefit/degs[i]
             D = network.synergism/degs[i]
             network.popPayoff.+= B.*network.edgeMatrix[i, :]
-            network.popPayoff.+= (D.*network.edgeMatrix[i, :].*network.popStrategies[ii]./degs)
+            network.popPayoff.+= (D.*network.edgeMatrix[i, :].*network.popStrategies./degs)
             network.popPayoff[i] -= network.cost
         end
         network.popPayoff[i] -= network.linkCost * degs[i]
