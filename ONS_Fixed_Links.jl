@@ -222,17 +222,47 @@ function distance(network::NetworkParameters)
 end
 
 #evolution functions
-function death(network::NetworkParameters)
+
+function deathbirth(network::NetworkParameters, findMom::Function, dbProb::Float64=1.0)
+    childID = deathfirst(network)
+    parentID = findMom(network, childID)
+    birth(network, childID, parentID)
+end
+
+function birthdeath(network::NetworkParameters, findMom::Function=anyMom, dbProb::Float64=0.0)
+    fitWeights = StatsBase.weights(network.popFitness)
+    parentID = sample(1:network.popSize, fitWeights)
+    childID = deathsecond(network, parentID)
+    birth(network, childID, parentID)
+end
+
+function mixeddb(network::NetworkParameters, findMom::Function, dbProb::Float64)
+    if(rand() < dbProb)
+        deathbirth(network, findMom)
+    else
+        birthdeath(network)
+    end
+end
+
+function deathfirst(network::NetworkParameters)
     deadID = sample(1:network.popSize)
     network.edgeMatrix[deadID, :] .= 0
     network.edgeMatrix[:, deadID] .= 0
     network.popPayoff[deadID] = 0
-    network.popFitness[deadID] = 1
+    network.popFitness[deadID] = 0
+    deadID
+end
+
+function deathsecond(network::NetworkParameters, parentID::Int64)
+    deadID  = (parentID + sample([1, -1]) + 99)%100 + 1 #picks a individual to die randomly from parent's neighbors
+    network.edgeMatrix[deadID, :] .= 0
+    network.edgeMatrix[:, deadID] .= 0
+    network.popPayoff[deadID] = 0
+    network.popFitness[deadID] = 0
     deadID
 end
 
 function anyMom(network::NetworkParameters, kID::Int64)
-    network.popFitness[kID] = 0
     fitWeights = StatsBase.weights(network.popFitness)
     momIndex = sample(1:network.popSize, fitWeights)
     resolveLocs(network, kID, momIndex) #updates locations, ensures each individual has a unique location
@@ -259,6 +289,7 @@ end
 
 function birth(network::NetworkParameters, child::Int64, parent::Int64)
     
+    network.popFitness[child] = 1
     network.popStrategies[child] = network.popStrategies[parent]
     if(rand()<network.muS)
         network.popStrategies[child] -= 1
@@ -308,6 +339,7 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
 
 end
 
+#inheritance functions
 function locInherit(network::NetworkParameters, child::Int64, parent::Int64)
     
     dists = network.distFactor.^(min.(abs.(network.popLocations.-network.popLocations[child]), abs.(network.popLocations.-network.popLocations[child].-network.popSize),abs.(network.popLocations.-network.popLocations[child].+network.popSize))) #creates weighted list of locations based on distFactor    for(i) in 1:network.popSize
@@ -456,7 +488,7 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, findMom::Function=anyMom, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, dbOrder::Function=mixeddb, dbProb::Float64=1.0, findMom::Function=anyMom, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(15) 
     repSims = reps
     for(x) in 1:repSims
@@ -467,9 +499,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
 
-            childID = death(network)
-            parentID = findMom(network, childID)
-            birth(network, childID, parentID)
+            dbOrder(network, findMom, dbProb)
             if(g > (20))
                 cooperate(network)
             end
@@ -527,7 +557,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
     #save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-@time begin
-    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, findMom=neighborMom, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
-    println(a)
-end
+#@time begin
+#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=neighborMom, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#    println(a)
+#end
