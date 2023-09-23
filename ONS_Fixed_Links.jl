@@ -223,22 +223,22 @@ end
 
 #evolution functions
 
-function deathbirth(network::NetworkParameters, findMom::Function, dbProb::Float64=1.0)
+function deathbirth(network::NetworkParameters, findMom::Function, neighborRange::Int64, dbProb::Float64=1.0)
     childID = deathfirst(network)
-    parentID = findMom(network, childID)
+    parentID = findMom(network, childID, neighborRange)
     birth(network, childID, parentID)
 end
 
-function birthdeath(network::NetworkParameters, findMom::Function=anyMom, dbProb::Float64=0.0)
+function birthdeath(network::NetworkParameters, findMom::Function=anyMom, neighborRange::Int64=1, dbProb::Float64=0.0)
     fitWeights = StatsBase.weights(network.popFitness)
     parentID = sample(1:network.popSize, fitWeights)
     childID = deathsecond(network, parentID)
     birth(network, childID, parentID)
 end
 
-function mixeddb(network::NetworkParameters, findMom::Function, dbProb::Float64)
+function mixeddb(network::NetworkParameters, findMom::Function, neighborRange::Int64, dbProb::Float64)
     if(rand() < dbProb)
-        deathbirth(network, findMom)
+        deathbirth(network, findMom, neighborRange)
     else
         birthdeath(network)
     end
@@ -262,17 +262,24 @@ function deathsecond(network::NetworkParameters, parentID::Int64)
     deadID
 end
 
-function anyMom(network::NetworkParameters, kID::Int64)
+function anyMom(network::NetworkParameters, kID::Int64, neighborRange::Int64=50)
     fitWeights = StatsBase.weights(network.popFitness)
     momIndex = sample(1:network.popSize, fitWeights)
     resolveLocs(network, kID, momIndex) #updates locations, ensures each individual has a unique location
     momIndex
 end
 
-function neighborMom(network::NetworkParameters, kID::Int64)
-    fitWeights = StatsBase.weights([network.popFitness[kID%100+1], network.popFitness[(kID+98)%100+1]]) #index plus/minus one, loops around 100
-    momIndex = (kID + sample([1, -1], fitWeights) + 99)%100 + 1 #have to use (idx +99)%100 + 1 to loop properly
-    momIndex
+function neighborMom(network::NetworkParameters, kID::Int64, neighborRange::Int64=1)
+    indexes = zeros(Int64, 2*neighborRange)
+    fitnesses = zeros(2*neighborRange)
+    for(i) in 1:neighborRange
+        indexes[i] = (kID-i+99)%100+1 #index minus 1 through neighborRange, loops around 100
+        indexes[i+neighborRange] = (kID+i+99)%100+1 #index plus 1 through neighborRange, loops around 100
+        fitnesses[i] = network.popFitness[indexes[i]] 
+        fitnesses[i+neighborRange] = network.popFitness[indexes[i+neighborRange]]
+    end
+    fitWeights = StatsBase.weights(fitnesses)
+    return sample(indexes, fitWeights) 
 end
 
 function resolveLocs(network::NetworkParameters, child, parent)
@@ -348,24 +355,24 @@ function locInherit(network::NetworkParameters, child::Int64, parent::Int64)
         if(i != child && network.edgeMatrix[i, child] == 0)
             if(network.edgeMatrix[i, parent] != 0)
                 if(network.popStrategies[i] == 1) #PNC MODE
-                    if(rand() * dists[i] < network.popPNC[child]) #prob to inherit multiplied by value for distance stored in dists
+                    if(rand() < network.popPNC[child] * dists[i]) #prob to inherit multiplied by value for distance stored in dists
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 else
-                    if(rand() * dists[i] < network.popPND[child]) #PND MODE
+                    if(rand() < network.popPND[child] * dists[i]) #PND MODE
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 end
             else
                 if(network.popStrategies[i] == 1) #PRC MODE
-                    if(rand() * dists[i] < network.popPRC[child])
+                    if(rand() < network.popPRC[child] * dists[i])
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 else
-                    if(rand() * dists[i] < network.popPRD[child]) #PRD MODE
+                    if(rand() < network.popPRD[child] * dists[i]) #PRD MODE
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
@@ -488,7 +495,7 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, dbOrder::Function=mixeddb, dbProb::Float64=1.0, findMom::Function=anyMom, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, dbOrder::Function=mixeddb, dbProb::Float64=1.0, findMom::Function=anyMom, neighborRange::Int64=1, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(15) 
     repSims = reps
     for(x) in 1:repSims
@@ -499,7 +506,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
 
-            dbOrder(network, findMom, dbProb)
+            dbOrder(network, findMom, neighborRange, dbProb)
             if(g > (20))
                 cooperate(network)
             end
@@ -558,6 +565,6 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
 end
 
 #@time begin
-#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=neighborMom, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=neighborMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
 #    println(a)
 #end
