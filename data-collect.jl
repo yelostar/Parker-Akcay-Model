@@ -13,12 +13,12 @@ addprocs(40)
     include("ONS_Fixed_Links.jl")
     while true
         pard = take!(inputs)
-        println(pard["ben"], " ", pard["cl"], " in pard")
-        coopFreq = runSimsReturn(; B=pard["ben"], C=0.5, D=0.0, CL=pard["cl"], gen=100000, dbOrder=deathbirth, findMom=anyMom, pn=0.5, distInherit=false, pnd=false, pr=0.0001, prd=false, muP=0.01, delta=0.5, sigmapn=0.01, sigmapr=0.01, reps=10)
+        println(pard["cl"], " ", pard["dthBthProb"], " in pard")
+        coopFreq = runSimsReturn(; B=2.0, C=0.5, D=0.0, CL=pard["cl"], gen=100000, distInherit=false, distFactor=1.0, dbOrder=mixeddb, dbProb=pard["dthBthProb"], findMom=neighborMom, neighborRange=1, pn=0.5, pnd=true, pr=0.0001, prd=false, muP=0.01, delta=0.5, sigmapn=0.01, sigmapr=0.01, reps=10)
         Keys = ["pnc_end","pnd_end","prc_end","prd_end","degree","assortment","distance","inclusion","coopFreq","fitness","shortestPath","connComponents","meanConnCompSize","largestConnComp","meanConnDistance"]
         temp = Dict(zip(Keys, coopFreq))
         temp = merge(pard, temp)
-        println(temp["ben"], " ", temp["cl"], " CF: ", round(temp["coopFreq"]; digits = 3), " PNC: ", round(temp["pnc_end"]; digits = 3), " PND: ", round(temp["pnd_end"]; digits = 3), " PRC: ", round(temp["prc_end"]; digits = 3), " PRD: ", round(temp["prd_end"]; digits = 3) )
+        println(temp["cl"], " ", temp["dthBthProb"], " CF: ", round(temp["coopFreq"]; digits = 3), " PNC: ", round(temp["pnc_end"]; digits = 3), " PND: ", round(temp["pnd_end"]; digits = 3), " PRC: ", round(temp["prc_end"]; digits = 3), " PRD: ", round(temp["prd_end"]; digits = 3))
         put!(results, temp)
     end
 end
@@ -26,11 +26,11 @@ end
 function fill_inputs(range,pars, nruns)
     for(i) in 1:range #PNC/PND 
         for(j) in 1:range #PNR 
-            vals = (10*i/range, 0.4*j/range)
+            vals = (0.4*i/range, (1.0*j/range)) 
             temp = copy(pars)
-            temp["ben"] = vals[1]
-            temp["cl"] = vals[2]
-            println(temp["ben"], " ", temp["cl"], "into inputs")
+            temp["cl"] = vals[1]
+            temp["dthBthProb"] = vals[2]
+            println(temp["cl"], " ", temp["dthBthProb"], " into inputs")
             nruns+=1
             put!(inputs, temp)
             #vals_arr.push(vals)
@@ -47,8 +47,8 @@ end
             
     vals_arr = Array{Tuple}
     pars = Dict([
-            "ben" => 0.0,
             "cl" => 0.0,
+            "dthBthProb" => 0.0,
             "pnc_end" => 0.0,
             "pnd_end" => 0.0,
             "prc_end" => 0.0,
@@ -72,9 +72,9 @@ end
     end
 
 
-    file = "anyMom_no_pnd_new.csv"
+    file = "mixed-db-iterate.csv"
         cols = push!(sort(collect(keys(pars))),
-                    ["ben", "cl"]...)
+                    ["cl", "dthBthProb"]...)
         dat = DataFrame(Dict([(c, Any[]) for c in cols]))
 
     for sim in 1:nruns
