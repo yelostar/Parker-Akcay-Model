@@ -275,11 +275,16 @@ function neighborMom(network::NetworkParameters, kID::Int64, neighborRange::Int6
     for(i) in 1:neighborRange
         indexes[i] = (kID-i+99)%100+1 #index minus 1 through neighborRange, loops around 100
         indexes[i+neighborRange] = (kID+i+99)%100+1 #index plus 1 through neighborRange, loops around 100
-        fitnesses[i] = network.popFitness[indexes[i]] 
+        fitnesses[i] = network.popFitness[indexes[i]] #same for fitnesses
+        if(indexes[i]==indexes[i+neighborRange]) #necessary for when neighborRange = popSize/2
+            break
+        end
         fitnesses[i+neighborRange] = network.popFitness[indexes[i+neighborRange]]
     end
     fitWeights = StatsBase.weights(fitnesses)
-    return sample(indexes, fitWeights) 
+    momIndex = sample(indexes, fitWeights) 
+    resolveLocs(network, kID, momIndex) #updates locations, ensures each individual has a unique location
+    momIndex
 end
 
 function resolveLocs(network::NetworkParameters, child, parent)
@@ -419,6 +424,13 @@ function nonDistInherit(network::NetworkParameters, child::Int64, parent::Int64)
     end
 end
 
+function resolveFitnesses(network::NetworkParameters)
+    for(i) in 1:network.popSize
+        network.popFitness[i] = (1.0 + network.delta) ^ network.popPayoff[i]
+    end
+    network.popPayoff[:] .= 0.0
+end
+
 function cooperate(network::NetworkParameters)
     degs = getDegree(network)
     for(i) in 1:network.popSize
@@ -439,13 +451,7 @@ function cooperate(network::NetworkParameters)
         end
         network.popPayoff[i] -= network.linkCost * degs[i]
     end
-end
-
-function resolveFitnesses(network::NetworkParameters)
-    for(i) in 1:network.popSize
-        network.popFitness[i] = (1.0 + network.delta) ^ network.popPayoff[i]
-    end
-    network.popPayoff[:] .= 0.0
+    resolveFitnesses(network)
 end
 
 function getDegree(network::NetworkParameters) #made less efficient by 2 in edgeMatrix; can use sum for 1/0 vals
@@ -506,14 +512,13 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
 
-            dbOrder(network, findMom, neighborRange, dbProb)
             if(g > (20))
                 cooperate(network)
             end
-            #cooperate(network)
-            resolveFitnesses(network)
 
-            if(g > (network.numGens * network.popSize / 5) && (g % network.popSize) == 0)
+            dbOrder(network, findMom, neighborRange, dbProb)
+
+            if(g > (network.numGens * network.popSize / 5) && (g % network.popSize) == 0) #metrics
                 coopRatio(network)
                 probInherit(network)
                 degrees(network)
@@ -565,6 +570,6 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
 end
 
 #@time begin
-#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=neighborMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=anyMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
 #    println(a)
 #end
