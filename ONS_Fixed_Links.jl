@@ -130,50 +130,36 @@ end
 
 function degrees(network::NetworkParameters)
     degTotal = 0
-    #assmtTotal = 0
     fitnessTotal = 0
     connDistTotal = 0
-    coopCount = 0.0 
+    numConnIndivids = 0
     for(i) in 1:network.popSize
         if(network.popStrategies[i]==1)
             coopCount+=1.0
         end
         fitnessTotal+=network.popFitness[i]
     end
-    coopCount = coopCount/network.popSize
     for(i) in 1:network.popSize
         degCounter = 0.0
         connDistCounter = 0.0
-        #assmtCounter = 0.0
         for(ii) in 1:network.popSize
             if(network.edgeMatrix[i, ii] != 0)
                 degCounter += 1.0
                 connDistCounter += min(abs(network.popLocations[i]-network.popLocations[ii]), abs.(network.popLocations[i]-network.popLocations[ii]-network.popSize),abs.(network.popLocations[i]-network.popLocations[ii]+network.popSize)) #adds distance between individuals' locations
-                #for(iii) in 1:network.popSize
-                #    if(network.edgeMatrix[ii, iii] != 0 && network.edgeMatrix[i, iii] != 0)
-                #        assmtCounter += 1.0
-                #    end
-                #end
             end
         end
         degTotal += degCounter
         if(degCounter != 0) #prevents divide by 0
             connDistCounter /= degCounter #divides sum of distances by total number of connections
+            numConnIndivids += 1
         end
         connDistTotal += connDistCounter
-        #if(network.popStrategies[i]==1)
-        #    assmtTotal+= (assmtCounter/degCounter)-(coopCount)
-        #else
-        #    assmtTotal+= (assmtCounter/degCounter)-(1-coopCount)
-        #end
     end
     degTotal /= network.popSize
-    connDistTotal /= network.popSize
+    connDistTotal /= numConnIndivids
     fitnessTotal /= network.popSize
-    #assmtTotal /= network.popSize
     network.meanDegree += degTotal
     network.meanFitness += fitnessTotal
-    #network.meanAssortment += assmtTotal
     network.meanDistConnection += connDistTotal
 end
 
@@ -269,7 +255,7 @@ function anyMom(network::NetworkParameters, kID::Int64, neighborRange::Int64=50)
     momIndex
 end
 
-function neighborMom(network::NetworkParameters, kID::Int64, neighborRange::Int64=1)
+function neighborMom(network::NetworkParameters, kID::Int64, neighborRange::Int64=1) #100 is hard-coded for popSize
     indexes = zeros(Int64, 2*neighborRange)
     fitnesses = zeros(2*neighborRange)
     for(i) in 1:neighborRange
