@@ -7,6 +7,7 @@ using FileIO
 using Graphs
 #using Plots
 
+
 mutable struct NetworkParameters
 
     #measurement data
@@ -34,7 +35,6 @@ mutable struct NetworkParameters
     popStrategies::Array{Int64, 1}
     popPayoff::Array{Float64, 1}
     popFitness::Array{Float64, 1}
-    popLocations::Array{Float64, 1}
 
     #structural variables
     numGens::Int64
@@ -60,7 +60,7 @@ mutable struct NetworkParameters
     sigmapr::Float64
 
     #distance inherit variables
-    distFactor::Float64
+    distFactor::Float64 
 
     function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, distFactor::Float64, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
 
@@ -78,16 +78,12 @@ mutable struct NetworkParameters
         popFitness = zeros(Float64, popSize)
         popFitness[:] .= 1.0
         
-        popLocations = zeros(Float64, popSize)
-        for(i) in 1:popSize
-            popLocations[i] = i #sets popLocations to [1, 2, ... popSize]
-        end
-        if(distInherit==true)
+        if(distInherit==true) #alternate set up of edgeMatrix
             edgeMatrix = zeros(popSize, popSize)
             for(i) in 1:popSize
-                linkWeights = distFactor.^(min.(abs.(popLocations.-popLocations[i]), abs.(popLocations.-popLocations[i].-popSize),abs.(popLocations.-popLocations[i].+popSize))) #creates weighted list of locations based on distFactor
+                linkWeights = distFactor.^locSelect(popSize, i) #creates weighted list of locations based on distFactor
                 links = zeros(Float64, Int(popSize/2)) 
-                sample!(popLocations, Weights(linkWeights), links, replace=false) #picks 50 links for each individual with probabilities weighted by locations
+                sample!((1:popSize), Weights(linkWeights), links, replace=false) #picks 50 links for each individual with probabilities weighted by locations
                 for(j) in links
                     edgeMatrix[i, Int(j)] = 1    
                 end
@@ -105,9 +101,15 @@ mutable struct NetworkParameters
         benefit = b
         linkCost = cL
         muS = muP #changing strategies
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, popLocations, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
     end
 end
+
+function locSelect(popSize::Int64, i::Int64)
+    locs = 1:popSize
+    distances = min.(abs.(locs.-locs[i]), abs.(locs.-locs[i].-popSize),abs.(locs.-locs[i].+popSize))
+    return distances
+end   
 
 #measurement functions
 function coopRatio(network::NetworkParameters)
@@ -134,18 +136,15 @@ function degrees(network::NetworkParameters)
     connDistTotal = 0
     numConnIndivids = 0
     for(i) in 1:network.popSize
-        if(network.popStrategies[i]==1)
-            coopCount+=1.0
-        end
         fitnessTotal+=network.popFitness[i]
-    end
-    for(i) in 1:network.popSize
         degCounter = 0.0
         connDistCounter = 0.0
+        connsVec = locSelect(network.popSize, i)
         for(ii) in 1:network.popSize
             if(network.edgeMatrix[i, ii] != 0)
                 degCounter += 1.0
-                connDistCounter += min(abs(network.popLocations[i]-network.popLocations[ii]), abs.(network.popLocations[i]-network.popLocations[ii]-network.popSize),abs.(network.popLocations[i]-network.popLocations[ii]+network.popSize)) #adds distance between individuals' locations
+                connDistCounter += connsVec[ii] #adds distance between individuals' locations
+                #originally connDistCounter += min(abs(network.popLocations[i]-network.popLocations[ii]), abs.(network.popLocations[i]-network.popLocations[ii]-network.popSize),abs.(network.popLocations[i]-network.popLocations[ii]+network.popSize)) 
             end
         end
         degTotal += degCounter
@@ -251,7 +250,6 @@ end
 function anyMom(network::NetworkParameters, kID::Int64, neighborRange::Int64=50)
     fitWeights = StatsBase.weights(network.popFitness)
     momIndex = sample(1:network.popSize, fitWeights)
-    resolveLocs(network, kID, momIndex) #updates locations, ensures each individual has a unique location
     momIndex
 end
 
@@ -269,20 +267,7 @@ function neighborMom(network::NetworkParameters, kID::Int64, neighborRange::Int6
     end
     fitWeights = StatsBase.weights(fitnesses)
     momIndex = sample(indexes, fitWeights) 
-    resolveLocs(network, kID, momIndex) #updates locations, ensures each individual has a unique location
     momIndex
-end
-
-function resolveLocs(network::NetworkParameters, child, parent)
-    deathDist = network.popLocations[child]-network.popLocations[parent]
-
-    for(i) in 1:network.popSize #adjusts location of each individual in between parent and child's old location
-        if((network.popLocations[i] > network.popLocations[parent] && network.popLocations[i] < network.popLocations[parent] + deathDist) || (network.popLocations[i] < network.popLocations[parent] && network.popLocations[i] > network.popLocations[parent] + deathDist))
-            network.popLocations[i] += deathDist/abs(deathDist) #adds or subtracts one based on sign of deathDist
-        end
-    end
-
-    network.popLocations[child] = network.popLocations[parent] + deathDist/abs(deathDist) #child's location set to parent +/- 1
 end
 
 function birth(network::NetworkParameters, child::Int64, parent::Int64)
@@ -340,7 +325,8 @@ end
 #inheritance functions
 function locInherit(network::NetworkParameters, child::Int64, parent::Int64)
     
-    dists = network.distFactor.^(min.(abs.(network.popLocations.-network.popLocations[child]), abs.(network.popLocations.-network.popLocations[child].-network.popSize),abs.(network.popLocations.-network.popLocations[child].+network.popSize))) #creates weighted list of locations based on distFactor    for(i) in 1:network.popSize
+    dists = network.distFactor.^locSelect(network.popSize, child)
+    #originally dists = network.distFactor.^(min.(abs.(network.popLocations.-network.popLocations[child]), abs.(network.popLocations.-network.popLocations[child].-network.popSize),abs.(network.popLocations.-network.popLocations[child].+network.popSize))) #creates weighted list of locations based on distFactor    for(i) in 1:network.popSize
 
     for(i) in 1:network.popSize
         if(i != child && network.edgeMatrix[i, child] == 0)
@@ -438,7 +424,7 @@ function cooperate(network::NetworkParameters)
         network.popPayoff[i] -= network.linkCost * degs[i]
     end
     resolveFitnesses(network)
-end
+end 
 
 function getDegree(network::NetworkParameters) #made less efficient by 2 in edgeMatrix; can use sum for 1/0 vals
     degGetter = zeros(100)
@@ -513,8 +499,6 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
             end
 
         end
-
-        #println(network.popLocations)
 
         #divides meanCooperationRatio by last 400 generations to get a true mean, then outputs
         network.meanProbNeighborCoop /= (network.numGens*0.8)
