@@ -27,7 +27,7 @@ end
 function fill_inputs(range, pars, nruns)
     for (i) in 1:range #PNC/PND 
         for (j) in 1:range #PNR 
-            vals = (0.4 * i / range, (0.75 + 0.2 * j / range))
+            vals = (0.4 * i / range, (0.75 + 0.25 * j / range))
             temp = copy(pars)
             temp["cl"] = vals[1]
             temp["distFactor"] = vals[2]
