@@ -1,7 +1,6 @@
 #!/usr/bin/env julia
 
 using JLD2
-using ArgParse
 using StatsBase
 using FileIO
 using Graphs
@@ -14,11 +13,11 @@ mutable struct NetworkParameters
     meanCoopFreq::Float64
     meanProbNeighborCoop::Float64
     meanProbNeighborDef::Float64
+    meanProbNeighborAcc::Float64
     meanProbRandomCoop::Float64
     meanProbRandomDef::Float64
+    meanProbRandomAcc::Float64
     meanDegree::Float64
-    meanAssortment::Float64
-    meanCoopDefDistance::Float64
     meanDistInclusion::Float64
     meanFitness::Float64
     meanShortestPaths::Float64
@@ -32,6 +31,8 @@ mutable struct NetworkParameters
     popPND::Array{Float64, 1}
     popPRC::Array{Float64, 1}
     popPRD::Array{Float64, 1}
+    popPNA::Array{Float64, 1}
+    popPRA::Array{Float64, 1}
     popStrategies::Array{Int64, 1}
     popPayoff::Array{Float64, 1}
     popFitness::Array{Float64, 1}
@@ -53,6 +54,7 @@ mutable struct NetworkParameters
     #simulation determining
     pnd::Bool
     prd::Bool
+    allowReject::Bool
     distInherit::Bool
 
     #evolving links variables
@@ -62,7 +64,7 @@ mutable struct NetworkParameters
     #distance inherit variables
     distFactor::Float64 
 
-    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, distFactor::Float64, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
+    function NetworkParameters(b::Float64, c::Float64, d::Float64, cL::Float64, gen::Int, distInherit::Bool, distFactor::Float64, pn::Float64, pnd::Bool, pr::Float64, prd::Bool, allowReject::Bool, pa::Float64, muP::Float64, delta::Float64, sigmapn::Float64, sigmapr::Float64)
 
         popSize = 100
         popPNC = zeros(Float64, popSize)
@@ -73,6 +75,18 @@ mutable struct NetworkParameters
         popPRC[:] .= pr
         popPRD = zeros(Float64, popSize)
         popPRD[:] .= pr
+
+        #probability to accept connections: PNA (paternal contacts) and PRA (random contacts)
+        popPNA = zeros(Float64, popSize)
+        popPRA = zeros(Float64, popSize)
+        if(allowReject) #if allowReject is false, PNA and PRA are set to 1.0 and are not allowed to separately evolve
+            popPNA[:] .= pa
+            popPRA[:] .= pa
+        else
+            popPNA[:] .= 1.0
+            popPRA[:] .= 1.0
+        end
+
         popStrategies = zeros(Int64, popSize)
         popStrategies[2:2:popSize] .= 1
         popFitness = zeros(Float64, popSize)
@@ -101,7 +115,7 @@ mutable struct NetworkParameters
         benefit = b
         linkCost = cL
         muS = muP #changing strategies
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, distInherit, sigmapn, sigmapr, distFactor)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popPNA, popPRA, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, allowReject, distInherit, sigmapn, sigmapr, distFactor)
     end
 end
 
@@ -126,8 +140,11 @@ end
 function probInherit(network::NetworkParameters)
     network.meanProbRandomCoop += sum(network.popPRC)/network.popSize
     network.meanProbRandomDef += sum(network.popPRD)/network.popSize
+    network.meanProbRandomAcc += sum(network.popPRA)/network.popSize
     network.meanProbNeighborCoop += sum(network.popPNC)/network.popSize
     network.meanProbNeighborDef += sum(network.popPND)/network.popSize
+    network.meanProbNeighborAcc += sum(network.popPNA)/network.popSize
+    
 end
 
 function degrees(network::NetworkParameters)
@@ -160,50 +177,6 @@ function degrees(network::NetworkParameters)
     network.meanDegree += degTotal
     network.meanFitness += fitnessTotal
     network.meanDistConnection += connDistTotal
-end
-
-function distance(network::NetworkParameters)
-    distanceTotal = 0.0
-    included = network.popSize
-    for(i) in 1:network.popSize
-        found = false
-        usualSuspects = zeros(Int64, network.popSize)
-        oldSuspects = zeros(Int64, network.popSize)
-        distCount = 0
-        usualSuspects[i] = 1
-        while(!found)
-            distCount += 1
-            oldSuspects .= usualSuspects
-            for(s) in 1:network.popSize
-                if(oldSuspects[s] == 1)
-                    for(ii) in 1:network.popSize
-                        if(network.edgeMatrix[s, ii] != 0)
-                            usualSuspects[ii] = 1
-                        end
-                    end
-                end
-            end
-            if(oldSuspects == usualSuspects)
-                found = true
-                distCount = NaN
-                included -= 1
-            else
-                for(ii) in 1:network.popSize
-                    if(usualSuspects[ii] == 1 && network.popStrategies[ii]!=network.popStrategies[i])
-                        found = true
-                    end
-                end
-            end
-        end
-        if(distCount == distCount)
-            distanceTotal += distCount
-        end
-    end
-    if(included!=0)
-        distanceTotal /= included
-    end
-    network.meanCoopDefDistance += distanceTotal
-    network.meanDistInclusion += included/network.popSize
 end
 
 #evolution functions
@@ -310,6 +283,22 @@ function birth(network::NetworkParameters, child::Int64, parent::Int64)
     else
         network.popPRD[child] = network.popPRC[child]
     end
+
+    if(network.allowReject) #allows evolution of PNA and PRA if true
+        network.popPNA[child] = network.popPNA[parent]
+        if(rand()<network.muP)
+            network.popPNA[child] += randn()*network.sigmapn
+            network.popPNA[child] = clamp(network.popPNA[child], 0, 1)
+        end
+        network.popPRA[child] = network.popPRA[parent]
+        if(rand()<network.muP)
+            network.popPRA[child] += randn()*network.sigmapr
+            network.popPRA[child] = clamp(network.popPRA[child], 0, 1)
+        end
+    else
+        network.popPNA[child] = 1.0
+        network.popPRA[child] = 1.0
+    end
          
     if(network.distInherit)
         locInherit(network, child, parent)
@@ -332,24 +321,24 @@ function locInherit(network::NetworkParameters, child::Int64, parent::Int64)
         if(i != child && network.edgeMatrix[i, child] == 0)
             if(network.edgeMatrix[i, parent] != 0)
                 if(network.popStrategies[i] == 1) #PNC MODE
-                    if(rand() < network.popPNC[child] * dists[i]) #prob to inherit multiplied by value for distance stored in dists
+                    if(rand() < network.popPNC[child] * network.popPNA[i] * dists[i]) #prob to inherit multiplied by value for distance stored in dists
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 else
-                    if(rand() < network.popPND[child] * dists[i]) #PND MODE
+                    if(rand() < network.popPND[child] * network.popPNA[i] * dists[i]) #PND MODE
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 end
             else
                 if(network.popStrategies[i] == 1) #PRC MODE
-                    if(rand() < network.popPRC[child] * dists[i])
+                    if(rand() < network.popPRC[child] * network.popPRA[i] * dists[i])
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 else
-                    if(rand() < network.popPRD[child] * dists[i]) #PRD MODE
+                    if(rand() < network.popPRD[child] * network.popPRA[i] * dists[i]) #PRD MODE
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
@@ -365,24 +354,24 @@ function nonDistInherit(network::NetworkParameters, child::Int64, parent::Int64)
         if(i != child && network.edgeMatrix[i, child] == 0)
             if(network.edgeMatrix[i, parent] != 0)
                 if(network.popStrategies[i] == 1) #PNC MODE
-                    if(rand() < network.popPNC[child])
+                    if(rand() < network.popPNC[child] * network.popPNA[i]) #PNC of child * PNA of individual newborn is connecting with 
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 else
-                    if(rand() < network.popPND[child]) #PND MODE
+                    if(rand() < network.popPND[child] * network.popPNA[i]) #PND of child * PNA of individual newborn is connecting with 
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 end
             else
-                if(network.popStrategies[i] == 1) #PRC MODE
-                    if(rand() < network.popPRC[child])
+                if(network.popStrategies[i] == 1) #PRC of child * PRA of individual newborn is connecting with 
+                    if(rand() < network.popPRC[child] * network.popPRA[i])
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
                 else
-                    if(rand() < network.popPRD[child]) #PRD MODE
+                    if(rand() < network.popPRD[child] * network.popPRA[i]) #PRD of child * PRA of individual newborn is connecting with 
                         network.edgeMatrix[i, child] = 1
                         network.edgeMatrix[child, i] = 1
                     end
@@ -473,13 +462,13 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 
 end
 
-function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, dbOrder::Function=mixeddb, dbProb::Float64=1.0, findMom::Function=anyMom, neighborRange::Int64=1, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
+function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, dbOrder::Function=mixeddb, dbProb::Float64=1.0, findMom::Function=anyMom, neighborRange::Int64=1, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, allowReject::Bool=false, pa::Float64=0.75, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
     dataArray = zeros(15) 
     repSims = reps
     for(x) in 1:repSims
 
         #initializes globalstuff structure with generic constructor
-        network = NetworkParameters(B, C, D, CL, gen, distInherit, distFactor, pn, pnd, pr, prd, muP, delta, sigmapn, sigmapr) #if pnd/prd = true, then defector & cooperator probabilities will evolve separately for pn/pr
+        network = NetworkParameters(B, C, D, CL, gen, distInherit, distFactor, pn, pnd, pr, prd, allowReject, pa, muP, delta, sigmapn, sigmapr) #if pnd/prd = true, then defector & cooperator probabilities will evolve separately for pn/pr
 
         #checks efficiency of simulation while running it
         for(g) in 1:(network.numGens * network.popSize)
@@ -495,7 +484,6 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
                 probInherit(network)
                 degrees(network)
                 graphCalc(network)
-                #distance(network)
             end
 
         end
@@ -503,12 +491,14 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         #divides meanCooperationRatio by last 400 generations to get a true mean, then outputs
         network.meanProbNeighborCoop /= (network.numGens*0.8)
         network.meanProbNeighborDef /= (network.numGens*0.8)
+        network.meanProbNeighborAcc /= (network.numGens*0.8)
         network.meanProbRandomCoop /= (network.numGens*0.8)
         network.meanProbRandomDef /= (network.numGens*0.8)
+        network.meanProbRandomAcc /= (network.numGens*0.8)
         network.meanDegree /= (network.numGens*0.8)
-        network.meanAssortment /= (network.numGens*0.8)
+        #network.meanAssortment /= (network.numGens*0.8)
         network.meanCoopFreq /= (network.numGens*0.8)
-        network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
+        #network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
         network.meanDistInclusion /= (network.popSize*network.numGens*0.8)
         network.meanFitness /= (network.numGens*0.8)
         network.meanShortestPaths /= (network.numGens*0.8)
@@ -522,8 +512,8 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[3] += network.meanProbRandomCoop
         dataArray[4] += network.meanProbRandomDef
         dataArray[5] += network.meanDegree
-        dataArray[6] += network.meanAssortment
-        dataArray[7] += network.meanCoopDefDistance
+        dataArray[6] += network.meanProbNeighborAcc
+        dataArray[7] += network.meanProbRandomAcc
         dataArray[8] += network.meanDistInclusion
         dataArray[9] += network.meanCoopFreq
         dataArray[10] += network.meanFitness
@@ -540,6 +530,6 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
 end
 
 #@time begin
-#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=anyMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=anyMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, allowReject=true, pa=0.75, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
 #    println(a)
 #end
