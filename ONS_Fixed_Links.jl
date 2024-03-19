@@ -25,6 +25,18 @@ mutable struct NetworkParameters
     meanConnCompSize::Float64
     meanLargestConnComp::Float64
     meanDistConnection::Float64
+    meanPCNC::Float64 #Average PNC accross cooperators
+    meanPCND::Float64 #Average PND accross cooperators
+    meanPCNA::Float64 #Average PNA accross cooperators
+    meanPCRC::Float64 #Average PRC accross cooperators
+    meanPCRD::Float64 #Average PRD accross cooperators
+    meanPCRA::Float64 #Average PRA accross cooperators
+    meanPDNC::Float64 #Average PNC accross defectors
+    meanPDND::Float64 #Average PND accross defectors
+    meanPDNA::Float64 #Average PNA accross defectors
+    meanPDRC::Float64 #Average PRC accross defectors
+    meanPDRD::Float64 #Average PRD accross defectors
+    meanPDRA::Float64 #Average PRA accross defectors
 
     #Node characteristics
     popPNC::Array{Float64, 1}
@@ -115,7 +127,7 @@ mutable struct NetworkParameters
         benefit = b
         linkCost = cL
         muS = muP #changing strategies
-        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popPNA, popPRA, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, allowReject, distInherit, sigmapn, sigmapr, distFactor)
+        new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, popPNC, popPND, popPRC, popPRD, popPNA, popPRA, popStrategies, zeros(Float64, popSize), popFitness, gen, popSize, edgeMatrix, cost, benefit, synergism, linkCost, muS, muP, delta, pnd, prd, allowReject, distInherit, sigmapn, sigmapr, distFactor)
     end
 end
 
@@ -127,12 +139,31 @@ end
 
 #measurement functions
 function coopRatio(network::NetworkParameters)
+    #cooperator count
     coopCount = 0
     for(i) in 1:network.popSize
         if(network.popStrategies[i] == 1)
             coopCount += 1
         end
     end
+    
+    #advanced inheritance statistics for cooperators
+    network.meanPCNC += sum(network.popPNC .* network.popStrategies) / coopCount
+    network.meanPCND += sum(network.popPND .* network.popStrategies) / coopCount
+    network.meanPCNA += sum(network.popPNA .* network.popStrategies) / coopCount
+    network.meanPCRC += sum(network.popPRC .* network.popStrategies) / coopCount
+    network.meanPCRD += sum(network.popPRD .* network.popStrategies) / coopCount
+    network.meanPCRA += sum(network.popPRA .* network.popStrategies) / coopCount
+    
+    #advanced inheritance statistics for defectors
+    network.meanPDNC += sum(network.popPNC .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
+    network.meanPDND += sum(network.popPND .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
+    network.meanPDNA += sum(network.popPNA .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
+    network.meanPDRC += sum(network.popPRC .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
+    network.meanPDRD += sum(network.popPRD .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
+    network.meanPDRA += sum(network.popPRA .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
+
+    #adds coopCount to meanCoopFreq
     coopCount /= network.popSize
     network.meanCoopFreq += coopCount
 end
@@ -144,7 +175,6 @@ function probInherit(network::NetworkParameters)
     network.meanProbNeighborCoop += sum(network.popPNC)/network.popSize
     network.meanProbNeighborDef += sum(network.popPND)/network.popSize
     network.meanProbNeighborAcc += sum(network.popPNA)/network.popSize
-    
 end
 
 function degrees(network::NetworkParameters)
@@ -463,7 +493,7 @@ function graphCalc(network::NetworkParameters) #computes all calculations involv
 end
 
 function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Float64=0.0, gen::Int=500, dbOrder::Function=mixeddb, dbProb::Float64=1.0, findMom::Function=anyMom, neighborRange::Int64=1, distInherit::Bool=false, distFactor::Float64=0.975, pn::Float64=0.5, pnd::Bool=false, pr::Float64=0.01, prd::Bool=false, allowReject::Bool=false, pa::Float64=0.75, muP::Float64=0.001, delta::Float64=0.1, sigmapn::Float64=0.05, sigmapr::Float64=0.01, reps::Int64=50)
-    dataArray = zeros(15) 
+    dataArray = zeros(27) 
     repSims = reps
     for(x) in 1:repSims
 
@@ -488,13 +518,25 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
 
         end
 
-        #divides meanCooperationRatio by last 400 generations to get a true mean, then outputs
+        #divides meanCooperationRatio by last 80% of generations to get a true mean, then outputs
         network.meanProbNeighborCoop /= (network.numGens*0.8)
         network.meanProbNeighborDef /= (network.numGens*0.8)
         network.meanProbNeighborAcc /= (network.numGens*0.8)
         network.meanProbRandomCoop /= (network.numGens*0.8)
         network.meanProbRandomDef /= (network.numGens*0.8)
         network.meanProbRandomAcc /= (network.numGens*0.8)
+        network.meanPCNC /= (network.numGens*0.8)
+        network.meanPCND /= (network.numGens*0.8)
+        network.meanPCNA /= (network.numGens*0.8)
+        network.meanPCRC /= (network.numGens*0.8)
+        network.meanPCRD /= (network.numGens*0.8)
+        network.meanPCRA /= (network.numGens*0.8)
+        network.meanPDNC /= (network.numGens*0.8)
+        network.meanPDND /= (network.numGens*0.8)
+        network.meanPDNA /= (network.numGens*0.8)
+        network.meanPDRC /= (network.numGens*0.8)
+        network.meanPDRD /= (network.numGens*0.8)
+        network.meanPDRA /= (network.numGens*0.8)
         network.meanDegree /= (network.numGens*0.8)
         #network.meanAssortment /= (network.numGens*0.8)
         network.meanCoopFreq /= (network.numGens*0.8)
@@ -522,6 +564,18 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[13] += network.meanConnCompSize
         dataArray[14] += network.meanLargestConnComp
         dataArray[15] += network.meanDistConnection
+        dataArray[16] += network.meanPCNC
+        dataArray[17] += network.meanPCND
+        dataArray[18] += network.meanPCNA
+        dataArray[19] += network.meanPCRC
+        dataArray[20] += network.meanPCRD
+        dataArray[21] += network.meanPCRA
+        dataArray[22] += network.meanPDNC
+        dataArray[23] += network.meanPDND
+        dataArray[24] += network.meanPDNA
+        dataArray[25] += network.meanPDRC
+        dataArray[26] += network.meanPDRD
+        dataArray[27] += network.meanPDRA
     end
     dataArray[:] ./= Float64(repSims)
     return dataArray
@@ -529,7 +583,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
     #save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-#@time begin
-#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=anyMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, allowReject=true, pa=0.75, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
-#    println(a)
-#end
+@time begin
+    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=anyMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, allowReject=true, pa=0.75, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+    println(a)
+end
