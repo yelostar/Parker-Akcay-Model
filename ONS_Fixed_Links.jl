@@ -148,20 +148,20 @@ function coopRatio(network::NetworkParameters)
     end
     
     #advanced inheritance statistics for cooperators
-    network.meanPCNC += sum(network.popPNC .* network.popStrategies) / coopCount
-    network.meanPCND += sum(network.popPND .* network.popStrategies) / coopCount
-    network.meanPCNA += sum(network.popPNA .* network.popStrategies) / coopCount
-    network.meanPCRC += sum(network.popPRC .* network.popStrategies) / coopCount
-    network.meanPCRD += sum(network.popPRD .* network.popStrategies) / coopCount
-    network.meanPCRA += sum(network.popPRA .* network.popStrategies) / coopCount
+    network.meanPCNC += sum(network.popPNC .* network.popStrategies)
+    network.meanPCND += sum(network.popPND .* network.popStrategies)
+    network.meanPCNA += sum(network.popPNA .* network.popStrategies)
+    network.meanPCRC += sum(network.popPRC .* network.popStrategies)
+    network.meanPCRD += sum(network.popPRD .* network.popStrategies)
+    network.meanPCRA += sum(network.popPRA .* network.popStrategies)
     
     #advanced inheritance statistics for defectors
-    network.meanPDNC += sum(network.popPNC .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
-    network.meanPDND += sum(network.popPND .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
-    network.meanPDNA += sum(network.popPNA .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
-    network.meanPDRC += sum(network.popPRC .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
-    network.meanPDRD += sum(network.popPRD .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
-    network.meanPDRA += sum(network.popPRA .* (1 .- network.popStrategies)) / (network.popSize - coopCount)
+    network.meanPDNC += sum(network.popPNC .* (1 .- network.popStrategies))
+    network.meanPDND += sum(network.popPND .* (1 .- network.popStrategies))
+    network.meanPDNA += sum(network.popPNA .* (1 .- network.popStrategies))
+    network.meanPDRC += sum(network.popPRC .* (1 .- network.popStrategies))
+    network.meanPDRD += sum(network.popPRD .* (1 .- network.popStrategies)) 
+    network.meanPDRA += sum(network.popPRA .* (1 .- network.popStrategies))
 
     #adds coopCount to meanCoopFreq
     coopCount /= network.popSize
@@ -519,27 +519,28 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         end
 
         #divides meanCooperationRatio by last 80% of generations to get a true mean, then outputs
+        network.meanCoopFreq /= (network.numGens*0.8)
         network.meanProbNeighborCoop /= (network.numGens*0.8)
         network.meanProbNeighborDef /= (network.numGens*0.8)
         network.meanProbNeighborAcc /= (network.numGens*0.8)
         network.meanProbRandomCoop /= (network.numGens*0.8)
         network.meanProbRandomDef /= (network.numGens*0.8)
         network.meanProbRandomAcc /= (network.numGens*0.8)
-        network.meanPCNC /= (network.numGens*0.8)
-        network.meanPCND /= (network.numGens*0.8)
-        network.meanPCNA /= (network.numGens*0.8)
-        network.meanPCRC /= (network.numGens*0.8)
-        network.meanPCRD /= (network.numGens*0.8)
-        network.meanPCRA /= (network.numGens*0.8)
-        network.meanPDNC /= (network.numGens*0.8)
-        network.meanPDND /= (network.numGens*0.8)
-        network.meanPDNA /= (network.numGens*0.8)
-        network.meanPDRC /= (network.numGens*0.8)
-        network.meanPDRD /= (network.numGens*0.8)
-        network.meanPDRA /= (network.numGens*0.8)
-        network.meanDegree /= (network.numGens*0.8)
+        network.meanPCNC /= (network.numGens * 0.8 * network.popSize * network.meanCoopFreq)
+        network.meanPCND /= (network.numGens * 0.8 * network.popSize * network.meanCoopFreq)
+        network.meanPCNA /= (network.numGens * 0.8 * network.popSize * network.meanCoopFreq)
+        network.meanPCRC /= (network.numGens * 0.8 * network.popSize * network.meanCoopFreq)
+        network.meanPCRD /= (network.numGens * 0.8 * network.popSize * network.meanCoopFreq)
+        network.meanPCRA /= (network.numGens * 0.8 * network.popSize * network.meanCoopFreq)
+        network.meanPDNC /= (network.numGens * 0.8 * network.popSize * (1-network.meanCoopFreq))
+        network.meanPDND /= (network.numGens * 0.8 * network.popSize * (1-network.meanCoopFreq))
+        network.meanPDNA /= (network.numGens * 0.8 * network.popSize * (1-network.meanCoopFreq))
+        network.meanPDRC /= (network.numGens * 0.8 * network.popSize * (1-network.meanCoopFreq))
+        network.meanPDRD /= (network.numGens * 0.8 * network.popSize * (1-network.meanCoopFreq))
+        network.meanPDRA /= (network.numGens * 0.8 * network.popSize * (1-network.meanCoopFreq))
+        network.meanDegree /= (network.numGens * 0.8 * network.popSize * (1-network.meanCoopFreq))
         #network.meanAssortment /= (network.numGens*0.8)
-        network.meanCoopFreq /= (network.numGens*0.8)
+        
         #network.meanCoopDefDistance /= (network.popSize*network.numGens*0.8)
         network.meanDistInclusion /= (network.popSize*network.numGens*0.8)
         network.meanFitness /= (network.numGens*0.8)
@@ -564,7 +565,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
         dataArray[13] += network.meanConnCompSize
         dataArray[14] += network.meanLargestConnComp
         dataArray[15] += network.meanDistConnection
-        dataArray[16] += network.meanPCNC
+        dataArray[16] += network.meanPCNC 
         dataArray[17] += network.meanPCND
         dataArray[18] += network.meanPCNA
         dataArray[19] += network.meanPCRC
@@ -583,7 +584,7 @@ function runSimsReturn(;B::Float64=2.0, C::Float64=0.5, D::Float64=0.0, CL::Floa
     #save("sim_PNCD$(pnc)_$(pnd)_PR$(pr)_CL$(CL)_B$(BEN)_G$(gen).jld2", "parameters", [CL, BEN], "meanPNI", dataArray[1], "meanPNR", dataArray[2], "meanPR", dataArray[3], "meanDegree", dataArray[4], "meanAssortment", dataArray[5], "meanDistanceFromDefToCoop", dataArray[6], "meanDistanceInclusion", dataArray[7], "meanCooperationRatio", dataArray[8])
 end
 
-@time begin
-    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=anyMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, allowReject=true, pa=0.75, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
-    println(a)
-end
+#@time begin
+#    a = runSimsReturn(; B=1.0, C=0.5, D=0.0, CL=0.05, gen=10000, pn=0.5, dbOrder=mixeddb, dbProb=0.5, findMom=anyMom, neighborRange=5, distInherit=true, distFactor=0.975, pnd=false, pr=0.0001, prd=false, allowReject=true, pa=0.75, muP=0.001, delta=0.1, sigmapn=0.01, sigmapr=0.01, reps=1)
+#    println(a)
+#end
